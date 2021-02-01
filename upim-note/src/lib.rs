@@ -155,6 +155,46 @@ impl Note {
         Ok(())
     }
 
+    // TODO: Rust is trying to run this as a doc-test -- why?
+    // https://github.com/rust-lang/rust/issues/81648
+    /* Add the given tag to the note.
+
+        If the note already exists, does nothing. If the tag is not prepended
+        with a '@', it is added.
+    */
+    pub fn push_tag(&mut self, tag: &str) {
+        let tag = if tag.starts_with('@') {
+            tag.into()
+        } else {
+            format!("@{}", tag)
+        };
+
+        if ! self.tags.contains(&tag) {
+            self.tags.push(tag);
+        }
+    }
+
+    // TODO: Rust is trying to run this as a doc-test -- why?
+    // https://github.com/rust-lang/rust/issues/81648
+    /* Remove the specified tag.
+
+       If the tag was not present, returns Err(()); otherwise, returns
+       Ok(()).
+    */
+    pub fn remove_tag(&mut self, tag: &str) -> std::result::Result<(), ()> {
+        if let Some(pos) = self.tags.iter().position(|x| *x == tag) {
+            self.tags.remove(pos);
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    /** Check whether the note contains the specified tag. */
+    pub fn contains_tag(&self, tag: &str) -> bool {
+        self.tags.contains(&tag.to_string())
+    }
+
     fn read_metadata_line(line: &str) -> anyhow::Result<Metadata> {
         assert!(line.len() > 1);
         assert!(line.ends_with('\n'), line.to_string());
@@ -314,5 +354,38 @@ mod tests {
             note.content,
             "Some content goes here.\n\nAnd more stuff.\n"
         );
+    }
+
+    #[test]
+    fn note_contains_tag() {
+        let text = "@tag1 @tag2\n";
+        let note = Note::from_str(text).unwrap();
+
+        assert!(note.contains_tag("@tag1"));
+        assert!(note.contains_tag("@tag2"));
+        assert!(! note.contains_tag("@tag3"));
+    }
+
+    #[test]
+    fn note_add_tag() {
+        let text = "@tag1\n";
+        let mut note = Note::from_str(text).unwrap();
+
+        note.push_tag("@tag2");
+        note.push_tag("tag3");
+
+        assert!(note.contains_tag("@tag1"));
+        assert!(note.contains_tag("@tag2"));
+        assert!(note.contains_tag("@tag3"));
+    }
+
+    #[test]
+    fn note_remove_tag() {
+        let text = "@tag1 @tag2\n";
+        let mut note = Note::from_str(text).unwrap();
+
+        assert!(note.remove_tag("@tag2").is_ok());
+        assert!(note.contains_tag("@tag1"));
+        assert!(! note.contains_tag("@tag2"));
     }
 }
