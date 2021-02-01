@@ -66,7 +66,7 @@ impl Note {
         }
     }
 
-    pub fn from_file(path: &str) -> anyhow::Result<Self> {
+    pub fn read_from_file(path: &str) -> anyhow::Result<Self> {
         use std::io::{prelude::*, BufReader};
 
         let mut note = Note::default();
