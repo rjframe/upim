@@ -39,7 +39,6 @@
 //! - The document could be more than just text. The current workaround would be
 //!   a header-only document with a [Ref: <url>] to another document.
 
-
 #![feature(split_inclusive)]
 #![feature(str_split_once)]
 #![feature(with_options)]
@@ -129,7 +128,6 @@ impl Note {
     pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
         let mut file = File::create(path)?;
 
-        // TODO: Place tags on a single line up to 80 chars?
         for meta in &self.meta {
             file.write_all(meta.to_string().as_bytes())?;
             file.write_all(b"\n")?;
@@ -148,7 +146,7 @@ impl Note {
         let line = &line[0..line.len()-1];
 
         if line.starts_with('@') {
-            let mut res = vec![];
+            let mut tags = vec![];
 
             for tag in line.split(' ') {
                 if tag.is_empty() { continue; }
@@ -158,7 +156,7 @@ impl Note {
                         return Err(anyhow!("Empty tags are invalid."));
                     }
 
-                    res.push(Metadata::Tag(tag.into()));
+                    tags.push(Metadata::Tag(tag.into()));
                 } else {
                     return Err(
                         anyhow!("Tag is missing the '@' symbol: {}", tag)
@@ -166,15 +164,14 @@ impl Note {
                 }
             }
 
-            Ok(res)
+            Ok(tags)
         } else if line.starts_with('[') && line.ends_with(']') {
             let line = &line[1..line.len()-1];
 
             let banned = |c| { c == '[' || c == ']' };
             if line.find(banned).is_some() {
                 return Err(anyhow!(
-                    "Metadata cannot contain '[' or ']' within its value: [{}]",
-                    line
+                    "Key-value pairs cannot contain '[' or ']': [{}]", line
                 ));
             }
 
