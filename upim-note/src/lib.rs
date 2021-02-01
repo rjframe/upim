@@ -92,11 +92,9 @@ impl FromStr for Note {
         for line in &mut lines {
             if line == "\n" { break; }
 
-            for meta in Self::read_metadata_line(line)? {
-                match meta {
-                    Metadata::Tag(s) => note.tags.push(s),
-                    Metadata::KV(k, v) => { note.map.insert(k, v); },
-                }
+            match Self::read_metadata_line(line)? {
+                Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
+                Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
         }
 
@@ -124,11 +122,9 @@ impl Note {
         let mut line = String::new();
 
         while reader.read_line(&mut line)? > 1 {
-            for meta in Self::read_metadata_line(line.trim())? {
-                match meta {
-                    Metadata::Tag(s) => note.tags.push(s),
-                    Metadata::KV(k, v) => { note.map.insert(k, v); },
-                }
+            match Self::read_metadata_line(line.trim())? {
+                Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
+                Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
         }
 
@@ -159,7 +155,7 @@ impl Note {
         Ok(())
     }
 
-    fn read_metadata_line(line: &str) -> anyhow::Result<Vec<Metadata>> {
+    fn read_metadata_line(line: &str) -> anyhow::Result<Metadata> {
         assert!(line.len() > 1);
         assert!(line.ends_with('\n'), line.to_string());
 
@@ -176,7 +172,7 @@ impl Note {
                         return Err(anyhow!("Empty tags are invalid."));
                     }
 
-                    tags.push(Metadata::Tag(tag.into()));
+                    tags.push(tag.into());
                 } else {
                     return Err(
                         anyhow!("Tag is missing the '@' symbol: {}", tag)
@@ -184,7 +180,7 @@ impl Note {
                 }
             }
 
-            Ok(tags)
+            Ok(Metadata::Tag(tags))
         } else if line.starts_with('[') && line.ends_with(']') {
             let line = &line[1..line.len()-1];
 
@@ -197,10 +193,10 @@ impl Note {
 
             match line.split_once(':') {
                 Some((k, v)) => {
-                    Ok([Metadata::KV(
+                    Ok(Metadata::KV(
                         k.trim().into(),
                         v.trim().into()
-                    )].into())
+                    ))
                 },
                 None => {
                     Err(anyhow!("Invalid key/value metadata line: [{}]", line))
@@ -215,7 +211,7 @@ impl Note {
 /** Supported metadata types in a note. */
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 enum Metadata {
-    Tag(String),
+    Tag(Vec<String>),
     KV(String, String),
 }
 
@@ -227,19 +223,27 @@ mod tests {
 
     #[test]
     fn read_tag_meta_line() {
-        let val = Note::read_metadata_line("@some-tag\n").unwrap();
-
-        assert_eq!(val.len(), 1);
-        assert_eq!(val[0], Metadata::Tag("@some-tag".into()));
+        if let Metadata::Tag(vs) =
+            Note::read_metadata_line("@some-tag\n").unwrap()
+        {
+            assert_eq!(vs.len(), 1);
+            assert_eq!(vs[0], "@some-tag");
+        } else {
+            panic!();
+        }
     }
 
     #[test]
     fn read_multiple_tags_meta_line() {
-        let val = Note::read_metadata_line("@some-tag @other-tag\n").unwrap();
-
-        assert_eq!(val.len(), 2);
-        assert_eq!(val[0], Metadata::Tag("@some-tag".into()));
-        assert_eq!(val[1], Metadata::Tag("@other-tag".into()));
+        if let Metadata::Tag(vs)=
+            Note::read_metadata_line("@some-tag @other-tag\n").unwrap()
+        {
+            assert_eq!(vs.len(), 2);
+            assert_eq!(vs[0], "@some-tag");
+            assert_eq!(vs[1], "@other-tag");
+        } else {
+            panic!();
+        }
     }
 
     #[test]
@@ -249,10 +253,12 @@ mod tests {
 
     #[test]
     fn read_key_value_meta_line() {
-        let val = Note::read_metadata_line("[Key: Value]\n").unwrap();
-
-        assert_eq!(val.len(), 1);
-        assert_eq!(val[0], Metadata::KV("Key".into(), "Value".into()));
+        if let Metadata::KV(k, v) =
+            Note::read_metadata_line("[Key: Value]\n").unwrap()
+        {
+            assert_eq!(k, "Key");
+            assert_eq!(v, "Value");
+        }
     }
 
     #[test]
@@ -297,8 +303,8 @@ mod tests {
 
         let note = Note::from_str(text).unwrap();
 
-        assert!(note.tags.len() == 3);
-        assert!(note.map.len() == 2);
+        assert_eq!(note.tags.len(), 3);
+        assert_eq!(note.map.len(), 2);
         assert_eq!(note.tags[0], "@some-tag");
         assert_eq!(note.tags[1], "@other-tag");
         assert_eq!(note.tags[2], "@another-tag");
