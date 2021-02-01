@@ -44,6 +44,7 @@
 #![feature(with_options)]
 
 use std::{
+    collections::HashMap,
     fs::File,
     io::Write,
     str::FromStr,
@@ -69,9 +70,12 @@ use anyhow::anyhow;
 
     The content must be UTF-8.
 */
-#[derive(Clone, Debug, Default, Eq, PartialEq, Hash)]
-struct Note {
-    meta: Vec<Metadata>,
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Note {
+    /** Arbitrary data tags on a note. */
+    tags: Vec<String>,
+    /** Key-value metadata on a note. */
+    map: HashMap<String, String>,
     // Large notes are possible; we may not always want to store the full
     // document in memory -- we could use a wrapper type that sets some maximum
     // buffer, backed by a file.
@@ -89,7 +93,10 @@ impl FromStr for Note {
             if line == "\n" { break; }
 
             for meta in Self::read_metadata_line(line)? {
-                note.meta.push(meta);
+                match meta {
+                    Metadata::Tag(s) => note.tags.push(s),
+                    Metadata::KV(k, v) => { note.map.insert(k, v); },
+                }
             }
         }
 
@@ -100,9 +107,11 @@ impl FromStr for Note {
 }
 
 impl Note {
-    pub fn new(meta: &[Metadata], text: &str) -> Self {
+    pub fn new(tags: &[String], map: HashMap<String, String>, text: &str)
+    -> Self {
         Self {
-            meta: meta.into(),
+            tags: tags.into(),
+            map: map,
             content: text.into(),
         }
     }
@@ -116,7 +125,10 @@ impl Note {
 
         while reader.read_line(&mut line)? > 1 {
             for meta in Self::read_metadata_line(line.trim())? {
-                note.meta.push(meta);
+                match meta {
+                    Metadata::Tag(s) => note.tags.push(s),
+                    Metadata::KV(k, v) => { note.map.insert(k, v); },
+                }
             }
         }
 
@@ -128,9 +140,17 @@ impl Note {
     pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
         let mut file = File::create(path)?;
 
-        for meta in &self.meta {
-            file.write_all(meta.to_string().as_bytes())?;
+        for tag in &self.tags {
+            file.write_all(tag.as_bytes())?;
             file.write_all(b"\n")?;
+        }
+
+        for (k, v) in &self.map {
+            file.write_all(b"[")?;
+            file.write_all(k.as_bytes())?;
+            file.write_all(b": ")?;
+            file.write_all(v.as_bytes())?;
+            file.write_all(b"]\n")?;
         }
 
         file.write_all(b"\n")?;
@@ -195,23 +215,8 @@ impl Note {
 /** Supported metadata types in a note. */
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 enum Metadata {
-    /** An arbitrary data tag on a note. */
     Tag(String),
-    /** Key-value metadata on a note. */
-    // For a large number of key-value pairs a hashmap would be more efficient
-    // than the vector of tuple's we're using now. We're probably fine but may
-    // need to change this in the future.
     KV(String, String),
-}
-
-impl std::fmt::Display for Metadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            Self::Tag(s) => s.into(),
-            Self::KV(k, v) => format!("[{}: {}]", k, v),
-        };
-        write!(f, "{}", text)
-    }
 }
 
 #[cfg(test)]
@@ -260,7 +265,8 @@ mod tests {
         let text = "\nSome text.\n";
 
         let val = Note::from_str(text).unwrap();
-        assert_eq!(val.meta.len(), 0);
+        assert_eq!(val.tags.len(), 0);
+        assert_eq!(val.map.len(), 0);
         assert_eq!(val.content, "Some text.\n");
     }
 
@@ -269,9 +275,10 @@ mod tests {
         let text = "@tag\n[some:stuff]\n";
 
         let val = Note::from_str(text).unwrap();
-        assert_eq!(val.meta.len(), 2);
-        assert_eq!(val.meta[0], Metadata::Tag("@tag".into()));
-        assert_eq!(val.meta[1], Metadata::KV("some".into(), "stuff".into()));
+        assert_eq!(val.tags.len(), 1);
+        assert_eq!(val.map.len(), 1);
+        assert_eq!(val.tags[0], "@tag");
+        assert_eq!(val.map["some"], "stuff");
         assert_eq!(val.content, "");
     }
 
@@ -290,12 +297,13 @@ mod tests {
 
         let note = Note::from_str(text).unwrap();
 
-        assert!(note.meta.len() == 5);
-        assert_eq!(note.meta[0], Metadata::Tag("@some-tag".into()));
-        assert_eq!(note.meta[1], Metadata::Tag("@other-tag".into()));
-        assert_eq!(note.meta[2], Metadata::Tag("@another-tag".into()));
-        assert_eq!(note.meta[3], Metadata::KV("Date".into(), "None".into()));
-        assert_eq!(note.meta[4], Metadata::KV("Some".into(), "Thing".into()));
+        assert!(note.tags.len() == 3);
+        assert!(note.map.len() == 2);
+        assert_eq!(note.tags[0], "@some-tag");
+        assert_eq!(note.tags[1], "@other-tag");
+        assert_eq!(note.tags[2], "@another-tag");
+        assert_eq!(note.map["Date"], "None");
+        assert_eq!(note.map["Some"], "Thing");
         assert_eq!(
             note.content,
             "Some content goes here.\n\nAnd more stuff.\n"
