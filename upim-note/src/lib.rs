@@ -1,3 +1,45 @@
+//! The uPIM Note API.
+//!
+//! A [Note] is a header and textual document, both UTF-8-encoded. The header
+//! contains arbitrary tags and key-value metadata. The header and document are
+//! separated by an empty line.
+//!
+//! A Note that begins with an empty line contains an empty header. It is not
+//! required to contain an extra new-line for a header-only document.
+//!
+//! # Example Documents
+//!
+//! ```text
+//! @to-read
+//! [Author: Favorite Person]
+//! [Title: Some Book]
+//! [Suggested by: Other Person]
+//!
+//! This was recommended to me by Other Person because I like books.
+//! ```
+//!
+//! ```text
+//! @website
+//! @some-subject @another-subject
+//! [Source: www.example.com]
+//!
+//! # Summary
+//!
+//! This is a summary of the information at example.com.
+//! ```
+//!
+//! No attempt to interpret the header or content is made by the library; all
+//! meaning is determined by the user and/or applications. This provides
+//! flexibility by allowing virtually limitless classification and
+//! cross-referencing of information, without the need to deal with semantic
+//! restrictions of the library.
+//!
+//! # Potential Future Extensions
+//!
+//! - The document could be more than just text. The current workaround would be
+//!   a header-only document with a [Ref: <url>] to another document.
+
+
 #![feature(split_inclusive)]
 #![feature(str_split_once)]
 #![feature(with_options)]
@@ -214,6 +256,26 @@ mod tests {
     #[test]
     fn only_one_kv_is_on_a_line() {
         assert!(Note::read_metadata_line("[k:v] [k:v]\n").is_err());
+    }
+
+    #[test]
+    fn read_note_with_empty_header() {
+        let text = "\nSome text.\n";
+
+        let val = Note::from_str(text).unwrap();
+        assert_eq!(val.meta.len(), 0);
+        assert_eq!(val.content, "Some text.\n");
+    }
+
+    #[test]
+    fn read_note_with_empty_content() {
+        let text = "@tag\n[some:stuff]\n";
+
+        let val = Note::from_str(text).unwrap();
+        assert_eq!(val.meta.len(), 2);
+        assert_eq!(val.meta[0], Metadata::Tag("@tag".into()));
+        assert_eq!(val.meta[1], Metadata::KV("some".into(), "stuff".into()));
+        assert_eq!(val.content, "");
     }
 
     #[test]
