@@ -1,7 +1,12 @@
 #![feature(split_inclusive)]
 #![feature(str_split_once)]
+#![feature(with_options)]
 
-use std::str::FromStr;
+use std::{
+    fs::File,
+    io::Write,
+    str::FromStr,
+};
 
 use anyhow::anyhow;
 
@@ -62,10 +67,7 @@ impl Note {
     }
 
     pub fn from_file(path: &str) -> anyhow::Result<Self> {
-        use std::{
-            fs::File,
-            io::{prelude::*, BufReader},
-        };
+        use std::io::{prelude::*, BufReader};
 
         let mut note = Note::default();
         let mut reader = BufReader::new(File::open(path)?);
@@ -80,6 +82,21 @@ impl Note {
         reader.read_to_string(&mut note.content)?;
 
         Ok(note)
+    }
+
+    pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
+        let mut file = File::create(path)?;
+
+        // TODO: Place tags on a single line up to 80 chars?
+        for meta in &self.meta {
+            file.write(meta.to_string().as_bytes())?;
+            file.write(b"\n")?;
+        }
+
+        file.write(b"\n")?;
+        file.write_all(self.content.as_bytes())?;
+
+        Ok(())
     }
 
     fn read_metadata_line(line: &str) -> anyhow::Result<Vec<Metadata>> {
@@ -148,9 +165,21 @@ enum Metadata {
     KV(String, String),
 }
 
+impl std::fmt::Display for Metadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let text = match self {
+            Self::Tag(s) => s.into(),
+            Self::KV(k, v) => format!("[{}: {}]", k, v),
+        };
+        write!(f, "{}", text)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO: Sandbox to test reading and writing notes.
 
     #[test]
     fn read_tag_meta_line() {
