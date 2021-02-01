@@ -89,11 +89,11 @@ impl Note {
 
         // TODO: Place tags on a single line up to 80 chars?
         for meta in &self.meta {
-            file.write(meta.to_string().as_bytes())?;
-            file.write(b"\n")?;
+            file.write_all(meta.to_string().as_bytes())?;
+            file.write_all(b"\n")?;
         }
 
-        file.write(b"\n")?;
+        file.write_all(b"\n")?;
         file.write_all(self.content.as_bytes())?;
 
         Ok(())
