@@ -55,26 +55,25 @@ use anyhow::anyhow;
 
 // TODO: Proper error types, handling.
 
-/** uPIM's note type.
-
-    No interpretation of the metadata is performed. Whether multiple key-value
-    pairs is allowed is application-specific.
-
-    A tag must begin with the '@' character, must have at least one character
-    following the '@' symbol, and ends with the following ' '; no other name
-    requirements exist.
-
-    Key-value metadata must not have an open or closing square brace within its
-    content ('[', ']'); keys cannot have a colon character (':'); whether values
-    may contain a colon is application-specific.
-
-    The content must be UTF-8.
-*/
+/// uPIM's note type.
+///
+/// No interpretation of the metadata is performed. Whether multiple key-value
+/// pairs is allowed is application-specific.
+///
+/// A tag must begin with the '@' character, must have at least one character
+/// following the '@' symbol, and ends with the following ' '; no other name
+/// requirements exist.
+///
+/// Key-value metadata must not have an open or closing square brace within its
+/// content ('[', ']'); keys cannot have a colon character (':'); whether values
+/// may contain a colon is application-specific.
+///
+/// The content must be UTF-8.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Note {
-    /** Arbitrary data tags on a note. */
+    /// Arbitrary data tags on a note.
     tags: Vec<String>,
-    /** Key-value metadata on a note. */
+    /// Key-value metadata on a note.
     map: HashMap<String, String>,
     // Large notes are possible; we may not always want to store the full
     // document in memory -- we could use a wrapper type that sets some maximum
@@ -174,13 +173,10 @@ impl Note {
         }
     }
 
-    // TODO: Rust is trying to run this as a doc-test -- why?
-    // https://github.com/rust-lang/rust/issues/81648
-    /* Remove the specified tag.
-
-       If the tag was not present, returns Err(()); otherwise, returns
-       Ok(()).
-    */
+    /// Remove the specified tag.
+    ///
+    /// If the tag was not present, returns Err(()); otherwise, returns
+    /// Ok(()).
     pub fn remove_tag(&mut self, tag: &str) -> std::result::Result<(), ()> {
         if let Some(pos) = self.tags.iter().position(|x| *x == tag) {
             self.tags.remove(pos);
@@ -190,7 +186,7 @@ impl Note {
         }
     }
 
-    /** Check whether the note contains the specified tag. */
+    /// Check whether the note contains the specified tag.
     pub fn contains_tag(&self, tag: &str) -> bool {
         self.tags.contains(&tag.to_string())
     }
@@ -248,7 +244,7 @@ impl Note {
     }
 }
 
-/** Supported metadata types in a note. */
+/// Supported metadata types in a note.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 enum Metadata {
     Tag(Vec<String>),
