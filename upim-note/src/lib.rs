@@ -172,14 +172,12 @@ impl Note {
 
     /// Remove the specified tag.
     ///
-    /// If the tag was not present, returns Err(()); otherwise, returns
-    /// Ok(()).
-    pub fn remove_tag(&mut self, tag: &str) -> std::result::Result<(), ()> {
+    /// If the tag was present, it is returned. Otherwise returns `None`.
+    pub fn remove_tag(&mut self, tag: &str) -> Option<String> {
         if let Some(pos) = self.tags.iter().position(|x| *x == tag) {
-            self.tags.remove(pos);
-            Ok(())
+            Some(self.tags.remove(pos))
         } else {
-            Err(())
+            None
         }
     }
 
