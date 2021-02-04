@@ -57,18 +57,20 @@ use anyhow::anyhow;
 
 /// uPIM's note type.
 ///
-/// No interpretation of the metadata is performed. Whether multiple key-value
-/// pairs is allowed is application-specific.
+/// No interpretation of the metadata is performed. Duplicate keys in the
+/// metadata are allowed; applications that seek to disallow duplicates must
+/// validate the keys.
 ///
 /// A tag must begin with the '@' character, must have at least one character
-/// following the '@' symbol, and ends with the following ' '; no other name
-/// requirements exist.
+/// following the '@' symbol, and ends with the following space or newline; no
+/// other name requirements exist. Duplicate tags are allowed but are only
+/// stored once.
 ///
 /// Key-value metadata must not have an open or closing square brace within its
 /// content ('[', ']'); keys cannot have a colon character (':'); whether values
 /// may contain a colon is application-specific.
 ///
-/// The content must be UTF-8.
+/// The content must be valid UTF-8.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Note {
     /// Arbitrary data tags on a note.
