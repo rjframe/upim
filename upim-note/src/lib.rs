@@ -50,10 +50,8 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::anyhow;
+use upim_core::error::FileError;
 
-
-// TODO: Proper error types, handling.
 
 /// uPIM's note type.
 ///
@@ -84,7 +82,7 @@ pub struct Note {
 }
 
 impl FromStr for Note {
-    type Err = anyhow::Error;
+    type Err = FileError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut note = Self::default();
@@ -115,7 +113,7 @@ impl Note {
         }
     }
 
-    pub fn read_from_file(path: &str) -> anyhow::Result<Self> {
+    pub fn read_from_file(path: &str) -> Result<Self, FileError> {
         use std::io::{prelude::*, BufReader};
 
         let mut note = Note::default();
@@ -190,7 +188,7 @@ impl Note {
         self.tags.contains(&tag.to_string())
     }
 
-    fn read_metadata_line(line: &str) -> anyhow::Result<Metadata> {
+    fn read_metadata_line(line: &str) -> Result<Metadata, FileError> {
         assert!(line.len() > 1);
         assert!(line.ends_with('\n'), line.to_string());
 
@@ -204,14 +202,18 @@ impl Note {
 
                 if tag.starts_with('@') {
                     if tag.len() == 1 {
-                        return Err(anyhow!("Empty tags are invalid."));
+                        return Err(FileError::Parse {
+                            msg: "Empty tags are invalid.".into(),
+                            data: "@".into()
+                        });
                     }
 
                     tags.push(tag.into());
                 } else {
-                    return Err(
-                        anyhow!("Tag is missing the '@' symbol: {}", tag)
-                    );
+                    return Err(FileError::Parse {
+                        msg: "Tag is missing the '@' symbol".into(),
+                        data: tag.into()
+                    });
                 }
             }
 
@@ -221,9 +223,10 @@ impl Note {
 
             let banned = |c| { c == '[' || c == ']' };
             if line.find(banned).is_some() {
-                return Err(anyhow!(
-                    "Key-value pairs cannot contain '[' or ']': [{}]", line
-                ));
+                return Err(FileError::Parse {
+                    msg: "Key-value pairs cannot contain '[' or ']'".into(),
+                    data: line.into()
+                });
             }
 
             match line.split_once(':') {
@@ -234,11 +237,17 @@ impl Note {
                     ))
                 },
                 None => {
-                    Err(anyhow!("Invalid key/value metadata line: [{}]", line))
+                    Err(FileError::Parse {
+                        msg: "Invalid key/value metadata line".into(),
+                        data: line.into()
+                    })
                 },
             }
         } else {
-            Err(anyhow!("Invalid metadata object: {}", line))
+            Err(FileError::Parse {
+                msg: "Invalid metadata object".into(),
+                data: line.into()
+            })
         }
     }
 }
@@ -379,7 +388,7 @@ mod tests {
         let text = "@tag1 @tag2\n";
         let mut note = Note::from_str(text).unwrap();
 
-        assert!(note.remove_tag("@tag2").is_ok());
+        assert_eq!(note.remove_tag("@tag2"), Some("@tag2".to_string()));
         assert!(note.contains_tag("@tag1"));
         assert!(! note.contains_tag("@tag2"));
     }
