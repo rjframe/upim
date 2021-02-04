@@ -156,13 +156,10 @@ impl Note {
         Ok(())
     }
 
-    // TODO: Rust is trying to run this as a doc-test -- why?
-    // https://github.com/rust-lang/rust/issues/81648
-    /* Add the given tag to the note.
-
-        If the note already exists, does nothing. If the tag is not prepended
-        with a '@', it is added.
-    */
+    /// Add the given tag to the note.
+    ///
+    /// If the note already exists, does nothing. If the tag is not prepended
+    /// with a '@', it is added.
     pub fn push_tag(&mut self, tag: &str) {
         let tag = if tag.starts_with('@') {
             tag.into()
