@@ -22,13 +22,16 @@
 
 use std::{
     collections::HashMap,
+    path::{Path, PathBuf},
     ops::Index,
+    env,
 };
 
 use super::error::FileError;
 
 
 // TODO: Write to file.
+// TODO: We should probably have a separate directory setup for macOS.
 
 /// Read the standard uPIM configuration.
 ///
@@ -36,20 +39,97 @@ use super::error::FileError;
 ///
 /// On UNIX-like operating systems:
 ///
-/// 1. /etc/upim/upim.conf XOR /etc/upim.conf
-/// 2. $HOME/.config/upim/upim.conf XOR $HOME/.config/upim.conf
-///    XOR $HOME/.upim.conf
-/// 3. <current working directory>/.upim.conf
+/// 1. `/etc/upim/upim.conf`
+/// 2. `$XDG_CONFIG_HOME/upim/upim.conf` XOR `$HOME/.config/upim/upim.conf`
+/// 3. `<current working directory>/.upim.conf`
 ///
 /// On Windows:
 ///
-/// 1. %COMMONPROGRAMFILES%\uPIM\conf.ini
-/// 2. %APPDATA\uPIM\conf.ini
-/// 3. <current working directory>/upim.ini
+/// 1. `%PROGRMDATA%\uPIM\upim.ini`
+/// 2. `%APPDATA\uPIM\upim.ini`
+/// 3. `<current working directory>\upim.ini`
 ///
 /// Values set in later files override the earlier values, so the priority is in
 /// the reverse order of the list above.
-pub fn read_upim_configuration() -> Config {
+///
+/// Applications built upon uPIM may place their own configuration files within
+/// a `upim` configuration directory but will need to read that configuration
+/// via the [Config] object rather than this function.
+///
+/// # Returns
+///
+/// If no configuration files were found, returns [Config::default].
+///
+/// Returns `Ok(Config)` if all discovered configuration files were successfully
+/// read. Otherwise, returns `Err(Config)` containing the settings from all
+/// successfully-read configuration files.
+///
+/// This function will be updated to report what errors occured in the failure
+/// case.
+pub fn read_upim_configuration() -> Result<Config, Config> {
+    let conf_files = get_upim_configuration_paths().unwrap_or_default();
+    let mut conf = Config::default();
+    let mut err_occured = false;
+
+    // TODO: we'll want .iter().try_for_each().collect::Result<...>() instead.
+    for file in conf_files.iter() {
+        let c = Config::read_from_file(file.to_str().unwrap_or_default());
+
+        if let Ok(c) = c {
+            conf = conf.merge_with(c);
+        } else {
+            err_occured = true;
+        }
+    }
+
+    if err_occured {
+        Err(conf)
+    } else {
+        Ok(conf)
+    }
+}
+
+/// Find and return the paths to the 'upim' directories discovered.
+///
+/// Only returns directories for uPIM configuration files; not top-level
+/// configuration directories (for example, if the only configuration file on
+/// the system is `/etc/upim.conf` this will return `None`; if there is an
+/// `/etc/upim/upim.conf` then this will return a [PathBuf] to `/etc/upim`).
+///
+/// This is most useful for applications that want to drop a configuration file
+/// into a uPIM configuration directory.
+///
+/// If all directories that contain a uPIM configuration file are desired, call
+/// [get_upim_configuration_paths] and call [PathBuf::pop] on each path
+/// returned.
+///
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+pub fn get_upim_configuration_dirs() -> Option<Vec<PathBuf>> {
+    #![allow(unreachable_code)]
+
+    #[cfg(windows)]
+    return get_windows_dirs();
+
+    #[cfg(unix)]
+    return get_unixy_dirs();
+
+    panic!();
+}
+
+/// Find and return the paths to the configuration files discovered.
+///
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+pub fn get_upim_configuration_paths() -> Option<Vec<PathBuf>> {
+    #![allow(unreachable_code)]
+
+    #[cfg(windows)]
+    return get_windows_paths();
+
+    #[cfg(unix)]
+    return get_unixy_paths();
+
     panic!();
 }
 
@@ -159,10 +239,12 @@ impl Config {
     // TODO: Vec<&str>? Iterator?
     /// Get the list of groups in the configuration file.
     pub fn groups(&self) -> Vec<String> {
+        // TODO: needs to be unique
         self.values.keys().map(|k| k.0.clone()).collect()
     }
 
     // TODO: Vec<&str>? Iterator?
+    // TODO: Return var/val pair iterator?
     /// Get the list of variables set in the specified group.
     pub fn variables_in_group(&self, group: &str) -> Vec<String> {
         self.values.keys()
@@ -171,6 +253,8 @@ impl Config {
             })
             .collect()
     }
+
+    // TODO: Rename these: get_default and get to match the sets:
 
     /// Retrieve the value of the specified variable within the DEFAULT group,
     /// or `None` if it is not set.
@@ -199,6 +283,122 @@ impl Index<(&str, &str)> for Config
 
     fn index(&self, key: (&str, &str)) -> &Self::Output {
         &self.values[&(key.0.into(), key.1.into())]
+    }
+}
+
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+#[allow(dead_code)]
+fn get_unixy_paths() -> Option<Vec<PathBuf>> {
+    let mut paths: Vec<PathBuf> = vec![];
+    let mut dirs = get_unixy_dirs().unwrap_or_default();
+
+    for dir in dirs.iter_mut() {
+        dir.push("/upim.conf");
+        if dir.exists() {
+            paths.push(dir.to_path_buf());
+        }
+    }
+
+    let mut pbuf = env::current_dir()
+        .map_or_else(|_| PathBuf::default(), |v| v);
+    pbuf.push("/.upim.conf");
+
+    if pbuf.as_path().exists() {
+        paths.push(pbuf);
+    }
+
+    if ! paths.is_empty() {
+        Some(paths)
+    } else {
+        None
+    }
+}
+
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+#[allow(dead_code)]
+fn get_windows_paths() -> Option<Vec<PathBuf>> {
+    let mut paths = vec![];
+    let mut dirs = get_windows_dirs().unwrap_or_default();
+
+    for dir in dirs.iter_mut() {
+        dir.push("/upim.ini");
+        if dir.exists() {
+            paths.push(dir.to_path_buf());
+        }
+    }
+
+    let mut pbuf = env::current_dir()
+        .map_or_else(|_e| PathBuf::default(), |v| v);
+    pbuf.push(r"\upim.ini");
+
+    if pbuf.as_path().exists() {
+        paths.push(pbuf);
+    }
+
+    if paths.is_empty() {
+        Some(paths)
+    } else {
+        None
+    }
+}
+
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+#[allow(dead_code)]
+fn get_unixy_dirs() -> Option<Vec<PathBuf>> {
+    use std::ffi::OsString;
+
+    let mut paths = vec![];
+
+    if Path::new("/etc/upim").exists() {
+        paths.push(PathBuf::from("/etc/upim"));
+    }
+
+    let path = if let Some(mut p) = env::var_os("XDG_CONFIG_HOME") {
+        p.push(OsString::from("/upim"));
+        p
+    } else if let Some(mut p) = env::var_os("HOME") {
+        p.push(OsString::from("/.config/upim"));
+        p
+    } else {
+        OsString::from("")
+    };
+
+    if Path::new(&path).exists() {
+        paths.push(PathBuf::from(path));
+    }
+
+    if ! paths.is_empty() {
+        Some(paths)
+    } else {
+        None
+    }
+}
+
+/// See the documentation for [read_upim_configuration] for the possible
+/// locations of the configuration files.
+#[allow(dead_code)]
+fn get_windows_dirs() -> Option<Vec<PathBuf>> {
+    use std::ffi::OsString;
+
+    let mut paths = vec![];
+
+    if let Some(mut path) = env::var_os("PROGRAMDATA") {
+        path.push(OsString::from(r"\uPIM"));
+        paths.push(PathBuf::from(path));
+    }
+
+    if let Some(mut path) = env::var_os("APPDATA") {
+        path.push(OsString::from(r"\uPIM"));
+        paths.push(PathBuf::from(path));
+    }
+
+    if paths.is_empty() {
+        Some(paths)
+    } else {
+        None
     }
 }
 

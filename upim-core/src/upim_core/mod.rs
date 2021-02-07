@@ -1,5 +1,5 @@
 pub mod config;
 pub mod error;
 
-pub use config::Config;
+pub use config::*;
 pub use error::*;
