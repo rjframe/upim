@@ -13,6 +13,8 @@
 // --attributes                     - instead of opening the file for editing,
 //                                    print the key-value attributes.
 //
+// TODO: Flags for adding/removing tags, attributes; editing attribute values.
+//
 // Without -C or -o, will start a blank document and save in the current working
 // directory unless [file] is an absolute path.
 
@@ -37,7 +39,6 @@
 // editor_arg = arg
 //
 // ; These override the others; most useful in CWD
-// ; TODO: I haven't implemented this.
 // [Collections]
 // <name> = /path/to/collection/folder
 // <name> = /path/to/collection/folder
@@ -260,11 +261,13 @@ fn read_config(path: &str) -> anyhow::Result<Config> {
     };
 
     for coll in global.variables_in_group("Collections").iter() {
-        conf = conf.set(
-            "Collections",
-            &coll,
-            global[("Collections", coll.as_str())].as_str()
-        );
+        if conf.get_group("Collections", &coll).is_none() {
+            conf = conf.set(
+                "Collections",
+                &coll,
+                global[("Collections", coll.as_str())].as_str()
+            );
+        }
     }
 
     Ok(conf)
