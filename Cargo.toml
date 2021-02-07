@@ -1,6 +1,7 @@
 [workspace]
 
 members = [
+    "applications/*",
     "upim-core",
     "upim-note",
 ]
