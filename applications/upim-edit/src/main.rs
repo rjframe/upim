@@ -121,7 +121,7 @@ fn print_usage() {
     println!("\t--help               - Print this help message");
 
     print!("\nWith the -C flag, <file> must be a relative path. Otherwise it ");
-    println!("be an absolute or \nrelative path.");
+    println!("may be an absolute or \nrelative path.");
 }
 
 #[derive(Debug, Eq, PartialEq)]
