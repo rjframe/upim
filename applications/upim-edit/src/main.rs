@@ -97,10 +97,31 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let editor = conf.get("editor").expect("No text editor set");
-    let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
-
-    launch_editor(editor, editor_arg, None);
+    match options.action {
+        Action::Edit => {
+            let editor = conf.get("editor").expect("No text editor set");
+            let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
+            launch_editor(editor, editor_arg, None);
+        },
+        Action::AddTags(tags) => {
+            unimplemented!();
+        },
+        Action::AddAttribute(k, v) => {
+            unimplemented!();
+        },
+        Action::RemoveTags(tags) => {
+            unimplemented!();
+        },
+        Action::RemoveAttribute(k) => {
+            unimplemented!();
+        },
+        Action::PrintTags => {
+            unimplemented!();
+        },
+        Action::PrintAttributes => {
+            unimplemented!();
+        },
+    }
 
     Ok(())
 }
