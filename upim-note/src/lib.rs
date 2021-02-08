@@ -141,10 +141,11 @@ impl Note {
         let mut line = String::new();
 
         while reader.read_line(&mut line)? > 1 {
-            match Self::read_metadata_line(line.trim())? {
+            match Self::read_metadata_line(&line)? {
                 Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
                 Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
+            line = "".into();
         }
 
         reader.read_to_string(&mut note.content)?;
