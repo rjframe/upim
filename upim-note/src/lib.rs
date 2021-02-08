@@ -1,8 +1,8 @@
 //! The uPIM Note API.
 //!
 //! A [Note] is a header and textual document, both UTF-8-encoded. The header
-//! contains arbitrary tags and key-value metadata. The header and document are
-//! separated by an empty line.
+//! contains arbitrary tags and key-value attributes. The header and document
+//! are separated by an empty line.
 //!
 //! A Note that begins with an empty line contains an empty header. It is not
 //! required to contain an extra new-line for a header-only document.
@@ -47,6 +47,7 @@ use std::{
     collections::HashMap,
     fs::File,
     io::Write,
+    ops::{Index, IndexMut},
     str::FromStr,
 };
 
@@ -56,24 +57,24 @@ use upim_core::error::FileError;
 /// uPIM's note type.
 ///
 /// No interpretation of the metadata is performed. Duplicate keys in the
-/// metadata are allowed; applications that seek to disallow duplicates must
-/// validate the keys.
+/// attribute list is allowed; applications that seek to disallow duplicates
+/// must validate the keys.
 ///
 /// A tag must begin with the '@' character, must have at least one character
 /// following the '@' symbol, and ends with the following space or newline; no
 /// other name requirements exist. Duplicate tags are allowed but are only
 /// stored once.
 ///
-/// Key-value metadata must not have an open or closing square brace within its
-/// content ('[', ']'); keys cannot have a colon character (':'); whether values
-/// may contain a colon is application-specific.
+/// Key-value attributes must not have an open or closing square brace within
+/// its content ('[', ']'); keys cannot have a colon character (':'); whether
+/// values may contain a colon is application-specific.
 ///
 /// The content must be valid UTF-8.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Note {
     /// Arbitrary data tags on a note.
     tags: Vec<String>,
-    /// Key-value metadata on a note.
+    /// Key-value attributes on a note.
     map: HashMap<String, String>,
     // Large notes are possible; we may not always want to store the full
     // document in memory -- we could use a wrapper type that sets some maximum
@@ -100,6 +101,25 @@ impl FromStr for Note {
         note.content = lines.collect();
 
         Ok(note)
+    }
+}
+
+impl Index<&str> for Note {
+    type Output = String;
+
+    /// Look up an attribute value by key.
+    fn index(&self, key: &str) -> &Self::Output {
+        &self.map[key]
+    }
+}
+
+impl IndexMut<&str> for Note {
+    /// Modify attribute value by key.
+    fn index_mut(&mut self, key: &str) -> &mut Self::Output {
+        if ! self.map.contains_key(key) {
+            self.map.insert(key.to_string(), String::new());
+        }
+        self.map.get_mut(key).unwrap()
     }
 }
 
@@ -158,7 +178,7 @@ impl Note {
     ///
     /// If the note already exists, does nothing. If the tag is not prepended
     /// with a '@', it is added.
-    pub fn push_tag(&mut self, tag: &str) {
+    pub fn insert_tag(&mut self, tag: &str) {
         let tag = if tag.starts_with('@') {
             tag.into()
         } else {
@@ -185,6 +205,31 @@ impl Note {
     pub fn contains_tag(&self, tag: &str) -> bool {
         self.tags.contains(&tag.to_string())
     }
+
+    /// Retrieve the list of tags on the note.
+    pub fn tags(&self) -> &[String] {
+        &self.tags
+    }
+
+    /// Add or update the specified attribute on the note.
+    pub fn set_attribute(&mut self, key: &str, value: &str) {
+        self.map.insert(key.into(), value.into());
+    }
+
+    pub fn remove_attribute(&mut self, key: &str) -> Option<String> {
+        self.map.remove(key)
+    }
+
+    /// Check whether the note contains the specified attribute.
+    pub fn contains_attribute(&self, key: &str) -> bool {
+        self.map.contains_key(key)
+    }
+
+    // TODO: Return iterator
+    pub fn attribute_keys(&self) -> Vec<String> {
+        self.map.keys().cloned().collect()
+    }
+
 
     fn read_metadata_line(line: &str) -> Result<Metadata, FileError> {
         assert!(line.len() > 1);
@@ -359,6 +404,34 @@ mod tests {
     }
 
     #[test]
+    fn lookup_attribute_by_key() {
+        let text = "\
+        [Date: None]\n\
+        [Some: Thing]\n\
+        ";
+
+        let note = Note::from_str(text).unwrap();
+        assert_eq!(note["Date"], "None");
+        assert_eq!(note["Some"], "Thing");
+    }
+
+    #[test]
+    fn create_and_modify_attributes_by_key() {
+        let text = "\
+        [Date: None]\n\
+        [Some: Thing]\n\
+        ";
+
+        let mut note = Note::from_str(text).unwrap();
+        note["Date"] = "January 1".into();
+        note["Year"] = "2000".into();
+
+        assert_eq!(note["Date"], "January 1");
+        assert_eq!(note["Some"], "Thing");
+        assert_eq!(note["Year"], "2000");
+    }
+
+    #[test]
     fn note_contains_tag() {
         let text = "@tag1 @tag2\n";
         let note = Note::from_str(text).unwrap();
@@ -373,8 +446,8 @@ mod tests {
         let text = "@tag1\n";
         let mut note = Note::from_str(text).unwrap();
 
-        note.push_tag("@tag2");
-        note.push_tag("tag3");
+        note.insert_tag("@tag2");
+        note.insert_tag("tag3");
 
         assert!(note.contains_tag("@tag1"));
         assert!(note.contains_tag("@tag2"));
@@ -389,5 +462,13 @@ mod tests {
         assert_eq!(note.remove_tag("@tag2"), Some("@tag2".to_string()));
         assert!(note.contains_tag("@tag1"));
         assert!(! note.contains_tag("@tag2"));
+    }
+
+    #[test]
+    fn note_list_tags() {
+        let text = "@tag1 @tag2\n";
+        let note = Note::from_str(text).unwrap();
+
+        assert_eq!(note.tags(), ["@tag1".to_string(), "@tag2".to_string()]);
     }
 }
