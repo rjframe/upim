@@ -124,6 +124,8 @@ impl IndexMut<&str> for Note {
 }
 
 impl Note {
+    // TODO: Add a read_header() method?
+
     pub fn new(tags: &[String], map: HashMap<String, String>, text: &str)
     -> Self {
         Self {
@@ -229,6 +231,17 @@ impl Note {
     // TODO: Return iterator
     pub fn attribute_keys(&self) -> Vec<String> {
         self.map.keys().cloned().collect()
+    }
+
+    // TODO: Return iterator
+    pub fn attributes(&self) -> Vec<(String, String)> {
+        let mut kv = vec![];
+
+        for key in self.map.keys() {
+            kv.push((key.into(), self.map[key].clone()));
+        }
+
+        kv
     }
 
 
