@@ -110,28 +110,28 @@ fn main() -> anyhow::Result<()> {
             let mut note = Note::read_from_file(file)?;
 
             for tag in &tags { note.insert_tag(tag); }
-            note.write_to_file(file);
+            note.write_to_file(file)?;
         },
         Action::AddAttribute(ref k, ref v) => {
             let file = options.file.to_str().unwrap();
             let mut note = Note::read_from_file(file)?;
 
             note.set_attribute(k, v);
-            note.write_to_file(file);
+            note.write_to_file(file)?;
         },
         Action::RemoveTags(tags) => {
             let file = options.file.to_str().unwrap();
             let mut note = Note::read_from_file(file)?;
 
             for tag in &tags { note.remove_tag(tag); }
-            note.write_to_file(file);
+            note.write_to_file(file)?;
         },
         Action::RemoveAttribute(ref k) => {
             let file = options.file.to_str().unwrap();
             let mut note = Note::read_from_file(file)?;
 
             note.remove_attribute(k);
-            note.write_to_file(file);
+            note.write_to_file(file)?;
         },
         Action::PrintTags => {
             let file = options.file.to_str().unwrap();
