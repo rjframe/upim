@@ -1,22 +1,13 @@
+//! upim-edit - uPIM notes editor
+//!
+//! upim-edit wraps an external text editor and is designed for two primary
+//! purposes:
+//!
+//! - scripting
+//! - convenient editing and validation of notes in collections.
+
 #![feature(bool_to_option)]
 #![feature(drain_filter)]
-
-// TODO - polish/finish/update/fix for man page:
-//
-// Usage: upim-edit [options] <file>
-//
-// -C <collection-name>             - Create/edit in the named collection.
-// --conf <path>                    - Use the following configuration file
-//                                    instead of the system/user upim-edit.conf.
-// --tags                           - instead of opening the file for editing,
-//                                    print the list of tags.
-// --attributes                     - instead of opening the file for editing,
-//                                    print the key-value attributes.
-//
-// TODO: Flags for adding/removing tags, attributes; editing attribute values.
-//
-// Without -C or -o, will start a blank document and save in the current working
-// directory unless [file] is an absolute path.
 
 // upim config file:
 //
@@ -110,23 +101,41 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn print_usage() {
-    println!("Usage: upim-edit [options...] <file>");
-    println!("Create and edit uPIM notes.\n");
+    println!(concat!(
+        "Usage: upim-edit [options...] <file>\n",
+        "Create and edit uPIM notes.\n\n",
 
-    println!("\t-C <collection-name> - Create/edit in the named collection");
-    println!("\t--conf <path>        - Use the specified configuration file");
-    println!("\t--tags               - Print the file's tags then exit");
-    print!  ("\t--attributes         - Print the file's key-value attributes ");
-    println!("then exit");
-    println!("\t--help               - Print this help message");
+        "\t-C <name>                 - Create/edit a note in the named ",
+        "collection\n",
+        "\t--conf <path>             - Use the specified configuration file\n",
+        "\t--tags                    - Print the note's tags then exit\n",
+        "\t--attributes              - Print the note's attributes then exit\n",
+        "\t--add-tags <tag>...       - Add one or more tags to the note\n",
+        "\t--add-attr <name> <value> - Add or edit an attribute\n",
+        "\t--remove-tags <tag>...    - Remove one or more tags from the note\n",
+        "\t--remove-attr <name>      - Remove an attribute from the note\n",
+        "\t--help                    - Print this help message\n",
 
-    print!("\nWith the -C flag, <file> must be a relative path. Otherwise it ");
-    println!("may be an absolute or \nrelative path.");
+        "\nWith the -C flag, <file> must be a path relative to the collection ",
+        "folder.\nOtherwise it may be an absolute path or a path relative to ",
+        "the current directory.\n\n",
+
+        "A tag is an arbitrary group of text (except spaces) prefixed by '@'.",
+        "\n\n",
+
+        "Attributes are key-value pairs of text. Spaces are allowed in both ",
+        "parts.\n`--add-attr` for an attribute that already exists will ",
+        "replace its value with\nthe new value.\n",
+    ));
 }
 
 #[derive(Debug, Eq, PartialEq)]
 enum Action {
     Edit,
+    AddTags(Vec<String>),
+    AddAttribute(String, String),
+    RemoveTags(Vec<String>),
+    RemoveAttribute(String),
     PrintTags,
     PrintAttributes,
 }
@@ -158,6 +167,9 @@ impl Options {
         }
         args = &args[1..args.len()];
 
+        // TODO: The majority of error messages assume the filename is given, so
+        // could be incorrect. I'd need to fully scan the array on each error
+        // and determine whether the final argument is a path to do better.
         while ! args.is_empty() {
             match args[0].as_ref() {
                 "-C" => {
@@ -169,7 +181,7 @@ impl Options {
                 },
                 "--conf" => {
                     if args.len() < 2 {
-                        return Err(anyhow!("Missing collection name"));
+                        return Err(anyhow!("Missing configuration path"));
                     }
                     if Path::new(&args[1]).exists() {
                         opts.conf_path = Some(PathBuf::from(&args[1]));
@@ -187,6 +199,39 @@ impl Options {
                 "--attributes" => {
                     opts.action = Action::PrintAttributes;
                     args = &args[1..args.len()];
+                },
+                "--add-tags" => {
+                    let tags = read_tags(&args)?;
+                    assert!(tags.len() < args.len());
+
+                    args = &args[tags.len()+1..args.len()];
+                    opts.action = Action::AddTags(tags);
+                },
+                "--add-attr" => {
+                    if args.len() < 3 {
+                        return Err(anyhow!("Missing attribute data"));
+                    }
+
+                    opts.action = Action::AddAttribute(
+                        args[1].clone(),
+                        args[2].clone(),
+                    );
+                    args = &args[3..args.len()];
+                },
+                "--remove-tags" => {
+                    let tags = read_tags(&args)?;
+                    assert!(tags.len() < args.len());
+
+                    args = &args[tags.len()+1..args.len()];
+                    opts.action = Action::RemoveTags(tags);
+                },
+                "--remove-attr" => {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Missing attribute name"));
+                    }
+
+                    opts.action = Action::RemoveAttribute(args[1].clone());
+                    args = &args[2..args.len()];
                 },
                 _ => {
                     opts.file = PathBuf::from(&args[0]);
@@ -217,6 +262,26 @@ impl Options {
             true
         }
     }
+}
+
+fn read_tags(args: &[String]) -> anyhow::Result<Vec<String>> {
+    let mut tags = vec![];
+    let mut i = 1;
+
+    while args[i].starts_with('@') {
+        tags.push(args[i].to_string());
+        i += 1;
+
+        if i == args.len() {
+            return Err(anyhow!("Missing file name"));
+        }
+    }
+
+    if tags.is_empty() {
+        return Err(anyhow!("No tags provided"));
+    }
+
+    Ok(tags)
 }
 
 /// Read the global uPIM and the upim-edit configurations.
@@ -365,5 +430,133 @@ mod tests {
         let opts = Options::new(&args).unwrap();
         assert_eq!(opts.file.to_str().unwrap(), "/tmp/some-file.txt");
         assert_eq!(opts.action, Action::PrintAttributes);
+    }
+
+    #[test]
+    fn args_add_tags() {
+        let args = vec!["upim-edit".into(),
+            "--add-tags".into(), "@tag1".into(), "@tag2".into(),
+            "/tmp/some-file.txt".into()
+        ];
+
+        let tags = vec!["@tag1".into(), "@tag2".into()];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(opts.action, Action::AddTags(tags));
+    }
+
+    #[test]
+    fn args_add_tags_missing_tags() {
+        let args = vec!["upim-edit".into(),
+            "--add-tags".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_add_tags_invalid_tag_name() {
+        let args = vec!["upim-edit".into(),
+            "--add-tags".into(), "tag1".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_add_attribute() {
+        let args = vec!["upim-edit".into(),
+            "--add-attr".into(), "key".into(), "value".into(),
+            "/tmp/some-file.txt".into()
+        ];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(
+            opts.action,
+            Action::AddAttribute("key".into(), "value".into())
+        );
+    }
+
+    #[test]
+    fn args_add_attribute_missing_one_kv() {
+        let args = vec!["upim-edit".into(),
+            "--add-attr".into(), "key".into(),
+            "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_add_attribute_missing_both_kv() {
+        let args = vec!["upim-edit".into(),
+            "--add-attr".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_add_attribute_spaces_in_kv() {
+        let args = vec!["upim-edit".into(),
+            "--add-attr".into(), "my key".into(), "my value".into(),
+            "/tmp/some-file.txt".into()
+        ];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(
+            opts.action,
+            Action::AddAttribute("my key".into(), "my value".into())
+        );
+    }
+
+    #[test]
+    fn args_remove_tags() {
+        let args = vec!["upim-edit".into(),
+            "--remove-tags".into(), "@tag1".into(), "@tag2".into(),
+            "/tmp/some-file.txt".into()
+        ];
+
+        let tags = vec!["@tag1".into(), "@tag2".into()];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(opts.action, Action::RemoveTags(tags));
+    }
+
+    #[test]
+    fn args_remove_tags_missing_tags() {
+        let args = vec!["upim-edit".into(),
+            "--remove-tags".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_remove_tags_invalid_tag_name() {
+        let args = vec!["upim-edit".into(),
+            "--remove-tags".into(), "tag1".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
+    }
+
+    #[test]
+    fn args_remove_attribute() {
+        let args = vec!["upim-edit".into(),
+            "--remove-attr".into(), "key".into(), "/tmp/some-file.txt".into()
+        ];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(opts.action, Action::RemoveAttribute("key".into()));
+    }
+
+    #[test]
+    fn args_remove_attribute_no_name() {
+        let args = vec!["upim-edit".into(),
+            "--remove-attr".into(), "/tmp/some-file.txt".into()
+        ];
+
+        assert!(Options::new(&args).is_err());
     }
 }
