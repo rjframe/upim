@@ -83,13 +83,18 @@ fn main() -> anyhow::Result<()> {
         print_usage();
         return Ok(());
     }
+    let options = options.unwrap();
 
-    let conf = if let Some(path) = find_default_configuration() {
-        read_config(path.to_str().unwrap())?
-    } else {
-        // TODO: If we can determine the editor from the environment we
-        // currently don't need a configuration file.
-        return Err(anyhow!("No configuration file found"));
+    let conf = {
+        let path = options.conf_path.or_else(find_default_configuration);
+
+        if let Some(path) = path {
+            read_config(path.to_str().unwrap())?
+        } else {
+            // TODO: If we can determine the editor from the environment we
+            // currently don't need a configuration file.
+            return Err(anyhow!("No configuration file found"));
+        }
     };
 
     let editor = conf.get("editor").expect("No text editor set");
