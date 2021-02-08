@@ -45,6 +45,7 @@ use std::{
 };
 
 use upim_core::config::*;
+use upim_note::Note;
 
 use anyhow::anyhow;
 
@@ -99,27 +100,54 @@ fn main() -> anyhow::Result<()> {
 
     match options.action {
         Action::Edit => {
+            // TODO: Finish implementation
             let editor = conf.get("editor").expect("No text editor set");
             let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
             launch_editor(editor, editor_arg, None);
         },
         Action::AddTags(tags) => {
-            unimplemented!();
+            let file = options.file.to_str().unwrap();
+            let mut note = Note::read_from_file(file)?;
+
+            for tag in &tags { note.insert_tag(tag); }
+            note.write_to_file(file);
         },
-        Action::AddAttribute(k, v) => {
-            unimplemented!();
+        Action::AddAttribute(ref k, ref v) => {
+            let file = options.file.to_str().unwrap();
+            let mut note = Note::read_from_file(file)?;
+
+            note.set_attribute(k, v);
+            note.write_to_file(file);
         },
         Action::RemoveTags(tags) => {
-            unimplemented!();
+            let file = options.file.to_str().unwrap();
+            let mut note = Note::read_from_file(file)?;
+
+            for tag in &tags { note.remove_tag(tag); }
+            note.write_to_file(file);
         },
-        Action::RemoveAttribute(k) => {
-            unimplemented!();
+        Action::RemoveAttribute(ref k) => {
+            let file = options.file.to_str().unwrap();
+            let mut note = Note::read_from_file(file)?;
+
+            note.remove_attribute(k);
+            note.write_to_file(file);
         },
         Action::PrintTags => {
-            unimplemented!();
+            let file = options.file.to_str().unwrap();
+            let note = Note::read_from_file(file)?;
+
+            for tag in note.tags().iter() {
+                println!("{}", tag);
+            }
         },
         Action::PrintAttributes => {
-            unimplemented!();
+            let file = options.file.to_str().unwrap();
+            let note = Note::read_from_file(file)?;
+
+            for (k, v) in note.attributes().iter() {
+                println!("{}:{}", k, v);
+            }
         },
     }
 
