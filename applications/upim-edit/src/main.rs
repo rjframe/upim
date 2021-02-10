@@ -56,75 +56,6 @@ use crate::{
 use anyhow::anyhow;
 
 
-/// Launch the editor and wait for it to exit.
-///
-/// # Arguments
-///
-/// * editor - the editor's name.
-/// * arg    - an option, if necessary, to tell the editor not to fork and
-///            detach from the shell that starts it.
-/// * path   - the path to a file to create or edit.
-fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
--> anyhow::Result<()>
-{
-    use std::{
-        process::Command,
-        time::SystemTime,
-        fs,
-    };
-
-    let mut args = vec![];
-    if let Some(arg) = arg { args.push(arg); }
-    // TODO: Should probably fail on invalid UTF-8.
-    let p = path.to_string_lossy();
-    args.push(&p);
-
-    // If we cannot read the file's last modification time, we call it `now`;
-    // we'll do the same later, effectively treating the file as always
-    // modified and will always validate it.
-    //
-    // We do return an error on permissions problems though -- lack of
-    // permission to read metadata probably means we won't be able to write to
-    // the file either. This may cause an unnecessary failure for systems that
-    // set privileges for applications rather than (or in addition to) users,
-    // since the editor might still have been able to edit the file.
-    let last_modified = if path.exists() {
-        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
-    } else {
-        SystemTime::now()
-    };
-
-    // TODO: Check exit code here?
-    Command::new(editor)
-        .args(args)
-        .spawn()?
-        .wait()?;
-
-    let maybe_modified = if path.exists() {
-        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
-    } else {
-        SystemTime::now()
-    };
-
-    // See if we need to validate the note. We assume that it was valid when it
-    // was opened, so only need to check it if it's been modified.
-    if maybe_modified > last_modified {
-        // TODO: Only read the header. Technically should scan the rest to
-        // ensure it's valid UTF-8; may not be worth it.
-        let res = Note::read_from_file(&path.to_string_lossy());
-        if let Err(e) = res {
-            // TODO: Offer to re-open to fix.
-            println!("Error validating file: {}", e);
-            Ok(())
-        } else {
-            Ok(())
-        }
-    } else {
-        // File wasn't saved. Do nothing.
-        Ok(())
-    }
-}
-
 fn main() -> anyhow::Result<()> {
     let options = Options::from_args(env::args());
     let options = if let Ok(opt) = options {
@@ -237,6 +168,75 @@ fn print_usage() {
         "parts.\n`--add-attr` for an attribute that already exists will ",
         "replace its value with\nthe new value.\n",
     ));
+}
+
+/// Launch the editor and wait for it to exit.
+///
+/// # Arguments
+///
+/// * editor - the editor's name.
+/// * arg    - an option, if necessary, to tell the editor not to fork and
+///            detach from the shell that starts it.
+/// * path   - the path to a file to create or edit.
+fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
+-> anyhow::Result<()>
+{
+    use std::{
+        process::Command,
+        time::SystemTime,
+        fs,
+    };
+
+    let mut args = vec![];
+    if let Some(arg) = arg { args.push(arg); }
+    // TODO: Should probably fail on invalid UTF-8.
+    let p = path.to_string_lossy();
+    args.push(&p);
+
+    // If we cannot read the file's last modification time, we call it `now`;
+    // we'll do the same later, effectively treating the file as always
+    // modified and will always validate it.
+    //
+    // We do return an error on permissions problems though -- lack of
+    // permission to read metadata probably means we won't be able to write to
+    // the file either. This may cause an unnecessary failure for systems that
+    // set privileges for applications rather than (or in addition to) users,
+    // since the editor might still have been able to edit the file.
+    let last_modified = if path.exists() {
+        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
+    } else {
+        SystemTime::now()
+    };
+
+    // TODO: Check exit code here?
+    Command::new(editor)
+        .args(args)
+        .spawn()?
+        .wait()?;
+
+    let maybe_modified = if path.exists() {
+        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
+    } else {
+        SystemTime::now()
+    };
+
+    // See if we need to validate the note. We assume that it was valid when it
+    // was opened, so only need to check it if it's been modified.
+    if maybe_modified > last_modified {
+        // TODO: Only read the header. Technically should scan the rest to
+        // ensure it's valid UTF-8; may not be worth it.
+        let res = Note::read_from_file(&path.to_string_lossy());
+        if let Err(e) = res {
+            // TODO: Offer to re-open to fix.
+            println!("Error validating file: {}", e);
+            Ok(())
+        } else {
+            Ok(())
+        }
+    } else {
+        // File wasn't saved. Do nothing.
+        Ok(())
+    }
 }
 
 /// Read the global uPIM and the upim-edit configurations.
