@@ -62,7 +62,7 @@ fn exec(command: &str, args: &[&str]) -> Output {
 
 #[test]
 fn add_tags_to_file() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag1 @tag2\n\
     \n\
     Some content.\n\
@@ -77,12 +77,12 @@ fn add_tags_to_file() {
     assert!(note.contains_tag("@tag3"));
     assert!(note.contains_tag("@tag4"));
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
 
 #[test]
 fn remove_tags() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag1 @tag2 @tag3 @tag4\n\
     \n\
     Some content.\n\
@@ -99,12 +99,12 @@ fn remove_tags() {
     assert!(! note.contains_tag("@tag3"));
     assert!(! note.contains_tag("@tag4"));
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
 
 #[test]
 fn list_tags() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag1 @tag2\n\
     \n\
     Some content.\n\
@@ -115,12 +115,12 @@ fn list_tags() {
 
     assert_eq!(output, "@tag1\n@tag2\n");
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
 
 #[test]
 fn add_attribute_to_file() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag\n\
     [key1: value1]\n\
     [key2: value2]\n\
@@ -136,12 +136,12 @@ fn add_attribute_to_file() {
     assert_eq!(note["key2"], "value2");
     assert_eq!(note["key3"], "value3");
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
 
 #[test]
 fn remove_attribute() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag\n\
     [key1: value1]\n\
     [key2: value2]\n\
@@ -158,12 +158,12 @@ fn remove_attribute() {
     assert_eq!(note["key3"], "value3");
     assert!(! note.contains_attribute("key2"));
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
 
 #[test]
 fn list_attributes() {
-    let (path, file) = temp_file_with("\
+    let (path, _) = temp_file_with("\
     @tag\n\
     [key1: value1]\n\
     [key2: value2]\n\
@@ -180,5 +180,5 @@ fn list_attributes() {
     assert!(! output.contains("@tag"));
     assert!(! output.contains("Some content"));
 
-    remove_file(path);
+    remove_file(path).unwrap();
 }
