@@ -223,7 +223,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
     // See if we need to validate the note. We assume that it was valid when it
     // was opened, so only need to check it if it's been modified. We also
     // assume that the note content is valid UTF-8. TODO: Check that?
-    if maybe_modified > last_modified {
+    if maybe_modified != last_modified {
         let res = Note::validate_header(&path);
         if let Err(e) = res {
             // TODO: Offer to re-open to fix.
