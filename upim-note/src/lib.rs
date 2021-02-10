@@ -135,6 +135,7 @@ impl Note {
         }
     }
 
+    // TODO: Use PathBuf
     pub fn read_from_file(path: &str) -> Result<Self, FileError> {
         use std::io::{prelude::*, BufReader};
 
@@ -147,7 +148,7 @@ impl Note {
                 Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
                 Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
-            line = "".into();
+            line.clear();
         }
 
         reader.read_to_string(&mut note.content)?;
@@ -155,6 +156,7 @@ impl Note {
         Ok(note)
     }
 
+    // TODO: Use PathBuf
     pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
         let mut file = File::create(path)?;
 
@@ -375,6 +377,12 @@ mod tests {
         assert_eq!(val.tags.len(), 0);
         assert_eq!(val.map.len(), 0);
         assert_eq!(val.content, "Some text.\n");
+    }
+
+    #[test]
+    fn fail_to_read_note_with_missing_header() {
+        let text = "Some text.\n";
+        assert!(Note::from_str(text).is_err());
     }
 
     #[test]
