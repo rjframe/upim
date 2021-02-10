@@ -8,4 +8,6 @@ edition = "2018"
 upim-core = { path = "../../upim-core" }
 upim-note = { path = "../../upim-note" }
 anyhow = "1.0.38"
+
+[dev-dependencies]
 rand = "0.8.3"

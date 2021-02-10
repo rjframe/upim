@@ -68,42 +68,31 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
 -> anyhow::Result<()>
 {
     use std::{
-        ffi::OsString,
         process::Command,
+        time::SystemTime,
         fs,
     };
 
-    // TODO: If path exists, copy it to temporary file. Or skip the temp file?
-    // There isn't much point unless we validate the note; we'd validate, report
-    // errors and [offer to?] reopen the note. But we can do that without a
-    // temporary, too; we could copy a backup on load to preserve the original?
-    // The danger in a temporary is long notes - system failure may mean data
-    // loss.
-    // OR: the editor should take care of the data preservation.
-    //
-    // Plan:
-    // - temp file on file creation
-    // - edit pre-existing files directly; the user/editor is responsible for
-    // the data.
-    // - on editor exit:
-    //      - validate the note
-    //      - report error(s)
-    //      - query to reopen
-
     let mut args = vec![];
     if let Some(arg) = arg { args.push(arg); }
+    // TODO: Should probably fail on invalid UTF-8.
+    let p = path.to_string_lossy();
+    args.push(&p);
 
-    // TODO: If path extension is empty, read default from config if present.
-    // TODO: Decision- could/should each collection have its own default format?
-    let empty_ext = OsString::new();
-    let ext = path.extension().unwrap_or(&empty_ext);
-
-    // TODO: I should probably fail on conversion errors for the extension.
-    // This lets me trust the conversion below.
-    let temp = gen_temp_file(&ext.to_string_lossy());
-    // Cannot lose data: random text is generated in the ASCII range.
-    let temp_str = temp.to_string_lossy();
-    args.push(&temp_str);
+    // If we cannot read the file's last modification time, we call it `now`;
+    // we'll do the same later, effectively treating the file as always
+    // modified and will always validate it.
+    //
+    // We do return an error on permissions problems though -- lack of
+    // permission to read metadata probably means we won't be able to write to
+    // the file either. This may cause an unnecessary failure for systems that
+    // set privileges for applications rather than (or in addition to) users,
+    // since the editor might still have been able to edit the file.
+    let last_modified = if path.exists() {
+        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
+    } else {
+        SystemTime::now()
+    };
 
     // TODO: Check exit code here?
     Command::new(editor)
@@ -111,17 +100,27 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
         .spawn()?
         .wait()?;
 
-    if temp.exists() {
-        // Move the file if possible; otherwise copy then remove the temp file.
-        fs::rename(&temp, &path)
-            .or_else(|_| {
-                fs::copy(&temp, &path)?;
-                // Ignore failure to remove the temporary file.
-                let _err = fs::remove_file(temp);
-                Ok(())
-            })
+    let maybe_modified = if path.exists() {
+        fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
     } else {
-        // File was not created. Do nothing.
+        SystemTime::now()
+    };
+
+    // See if we need to validate the note. We assume that it was valid when it
+    // was opened, so only need to check it if it's been modified.
+    if maybe_modified > last_modified {
+        // TODO: Only read the header. Technically should scan the rest to
+        // ensure it's valid UTF-8; may not be worth it.
+        let res = Note::read_from_file(&path.to_string_lossy());
+        if let Err(e) = res {
+            // TODO: Offer to re-open to fix.
+            println!("Error validating file: {}", e);
+            Ok(())
+        } else {
+            Ok(())
+        }
+    } else {
+        // File wasn't saved. Do nothing.
         Ok(())
     }
 }
@@ -154,7 +153,6 @@ fn main() -> anyhow::Result<()> {
 
     match options.action {
         Action::Edit => {
-            // TODO: Finish implementation
             let editor = conf.get("editor").expect("No text editor set");
             let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
             launch_editor(editor, editor_arg, &options.file)?;
@@ -239,31 +237,6 @@ fn print_usage() {
         "parts.\n`--add-attr` for an attribute that already exists will ",
         "replace its value with\nthe new value.\n",
     ));
-}
-
-fn gen_temp_file(extension: &str) -> PathBuf {
-    use rand::{
-        distributions::Alphanumeric,
-        Rng,
-        thread_rng,
-    };
-
-    let mut rng = thread_rng();
-    let path = env::temp_dir();
-
-    loop {
-        let name: String = (&mut rng).sample_iter(Alphanumeric)
-            .take(8)
-            .map(char::from)
-            .collect();
-
-        let mut file = path.clone();
-
-        file.push(name);
-        file.set_extension(extension);
-
-        if ! file.exists() { break file; }
-    }
 }
 
 /// Read the global uPIM and the upim-edit configurations.
