@@ -41,7 +41,7 @@
 
 use std::{
     path::{Path, PathBuf},
-    env
+    env,
 };
 
 use upim_core::config::*;
@@ -77,14 +77,15 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: Option<&str>) {
     // TODO: Check res.
 }
 
-// TODO: Return codes.
 fn main() -> anyhow::Result<()> {
     let options = Options::from_args(env::args());
-    if options.is_err() {
+    let options = if let Ok(opt) = options {
+        // TODO: Handle --help
+        opt
+    } else {
         print_usage();
         return Ok(());
-    }
-    let options = options.unwrap();
+    };
 
     let conf = {
         let path = options.conf_path.or_else(find_default_configuration);
