@@ -5,9 +5,7 @@ authors = ["Ryan Frame <code@ryanjframe.com>"]
 edition = "2018"
 
 [dependencies]
-anyhow = "1.0.38"
 upim-core = { path = "../../upim-core" }
 upim-note = { path = "../../upim-note" }
-
-[dev-dependencies]
+anyhow = "1.0.38"
 rand = "0.8.3"

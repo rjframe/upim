@@ -56,7 +56,6 @@ use crate::{
 use anyhow::anyhow;
 
 
-// TODO: Return error, don't expect().
 /// Launch the editor and wait for it to exit.
 ///
 /// # Arguments
@@ -64,23 +63,67 @@ use anyhow::anyhow;
 /// * editor - the editor's name.
 /// * arg    - an option, if necessary, to tell the editor not to fork and
 ///            detach from the shell that starts it.
-/// * path   - the path to a file to open, if desired.
-fn launch_editor(editor: &str, arg: Option<&str>, path: Option<&str>) {
-    // TODO: Open a temporary file, validate and move once closed?
-    use std::process::Command;
+/// * path   - the path to a file to create or edit.
+fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
+-> anyhow::Result<()>
+{
+    use std::{
+        ffi::OsString,
+        process::Command,
+        fs,
+    };
+
+    // TODO: If path exists, copy it to temporary file. Or skip the temp file?
+    // There isn't much point unless we validate the note; we'd validate, report
+    // errors and [offer to?] reopen the note. But we can do that without a
+    // temporary, too; we could copy a backup on load to preserve the original?
+    // The danger in a temporary is long notes - system failure may mean data
+    // loss.
+    // OR: the editor should take care of the data preservation.
+    //
+    // Plan:
+    // - temp file on file creation
+    // - edit pre-existing files directly; the user/editor is responsible for
+    // the data.
+    // - on editor exit:
+    //      - validate the note
+    //      - report error(s)
+    //      - query to reopen
 
     let mut args = vec![];
-
     if let Some(arg) = arg { args.push(arg); }
-    if let Some(path) = path { args.push(path); }
 
-    let mut child = Command::new(editor)
+    // TODO: If path extension is empty, read default from config if present.
+    // TODO: Decision- could/should each collection have its own default format?
+    let empty_ext = OsString::new();
+    let ext = path.extension().unwrap_or(&empty_ext);
+
+    // TODO: I should probably fail on conversion errors for the extension.
+    // This lets me trust the conversion below.
+    let temp = gen_temp_file(&ext.to_string_lossy());
+    // Cannot lose data: random text is generated in the ASCII range.
+    let temp_str = temp.to_string_lossy();
+    args.push(&temp_str);
+
+    // TODO: Check exit code here?
+    Command::new(editor)
         .args(args)
-        .spawn()
-        .expect("Failed to execute command");
+        .spawn()?
+        .wait()?;
 
-    let _res = child.wait().expect("Failed to wait");
-    // TODO: Check res.
+    if temp.exists() {
+        // Move the file if possible; otherwise copy then remove the temp file.
+        fs::rename(&temp, &path)
+            .or_else(|_| {
+                fs::copy(&temp, &path)?;
+                // Ignore failure to remove the temporary file.
+                let _err = fs::remove_file(temp);
+                Ok(())
+            })
+    } else {
+        // File was not created. Do nothing.
+        Ok(())
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -114,7 +157,7 @@ fn main() -> anyhow::Result<()> {
             // TODO: Finish implementation
             let editor = conf.get("editor").expect("No text editor set");
             let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
-            launch_editor(editor, editor_arg, None);
+            launch_editor(editor, editor_arg, &options.file)?;
         },
         Action::AddTags(tags) => {
             let file = options.file.to_str().unwrap();
@@ -196,6 +239,31 @@ fn print_usage() {
         "parts.\n`--add-attr` for an attribute that already exists will ",
         "replace its value with\nthe new value.\n",
     ));
+}
+
+fn gen_temp_file(extension: &str) -> PathBuf {
+    use rand::{
+        distributions::Alphanumeric,
+        Rng,
+        thread_rng,
+    };
+
+    let mut rng = thread_rng();
+    let path = env::temp_dir();
+
+    loop {
+        let name: String = (&mut rng).sample_iter(Alphanumeric)
+            .take(8)
+            .map(char::from)
+            .collect();
+
+        let mut file = path.clone();
+
+        file.push(name);
+        file.set_extension(extension);
+
+        if ! file.exists() { break file; }
+    }
 }
 
 /// Read the global uPIM and the upim-edit configurations.
