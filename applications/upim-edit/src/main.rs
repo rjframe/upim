@@ -221,15 +221,13 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
     };
 
     // See if we need to validate the note. We assume that it was valid when it
-    // was opened, so only need to check it if it's been modified.
+    // was opened, so only need to check it if it's been modified. We also
+    // assume that the note content is valid UTF-8. TODO: Check that?
     if maybe_modified > last_modified {
-        // TODO: Only read the header. Technically should scan the rest to
-        // ensure it's valid UTF-8; may not be worth it.
-        let res = Note::read_from_file(&path.to_string_lossy());
+        let res = Note::validate_header(&path);
         if let Err(e) = res {
             // TODO: Offer to re-open to fix.
-            println!("Error validating file: {}", e);
-            Ok(())
+            Err(e)?
         } else {
             Ok(())
         }

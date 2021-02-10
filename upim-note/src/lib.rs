@@ -48,6 +48,7 @@ use std::{
     fs::File,
     io::Write,
     ops::{Index, IndexMut},
+    path::PathBuf,
     str::FromStr,
 };
 
@@ -133,6 +134,21 @@ impl Note {
             map: map,
             content: text.into(),
         }
+    }
+
+    /// Validate the header of a note at the given path.
+    pub fn validate_header(path: &PathBuf) -> Result<(), FileError> {
+        use std::io::{prelude::*, BufReader};
+
+        let mut reader = BufReader::new(File::open(path)?);
+        let mut line = String::new();
+
+        while reader.read_line(&mut line)? > 1 {
+            Self::read_metadata_line(&line)?;
+            line.clear();
+        }
+
+        Ok(())
     }
 
     // TODO: Use PathBuf
