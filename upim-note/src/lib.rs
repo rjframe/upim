@@ -89,11 +89,13 @@ impl FromStr for Note {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut note = Self::default();
         let mut lines = s.split_inclusive('\n');
+        let mut cnt = 0;
 
         for line in &mut lines {
+            cnt += 1;
             if line == "\n" { break; }
 
-            match Self::read_metadata_line(line)? {
+            match Self::read_metadata_line(line, cnt)? {
                 Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
                 Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
@@ -142,9 +144,11 @@ impl Note {
 
         let mut reader = BufReader::new(File::open(path)?);
         let mut line = String::new();
+        let mut cnt = 0;
 
         while reader.read_line(&mut line)? > 1 {
-            Self::read_metadata_line(&line)?;
+            cnt += 1;
+            Self::read_metadata_line(&line, cnt)?;
             line.clear();
         }
 
@@ -158,9 +162,12 @@ impl Note {
         let mut note = Note::default();
         let mut reader = BufReader::new(File::open(path)?);
         let mut line = String::new();
+        let mut cnt = 0;
 
         while reader.read_line(&mut line)? > 1 {
-            match Self::read_metadata_line(&line)? {
+            cnt += 1;
+
+            match Self::read_metadata_line(&line, cnt)? {
                 Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
                 Metadata::KV(k, v) => { note.map.insert(k, v); },
             }
@@ -263,7 +270,8 @@ impl Note {
     }
 
 
-    fn read_metadata_line(line: &str) -> Result<Metadata, FileError> {
+    fn read_metadata_line(line: &str, line_num: u32,)
+    -> Result<Metadata, FileError> {
         assert!(line.len() > 1);
         assert!(line.ends_with('\n'), line.to_string());
 
@@ -279,7 +287,8 @@ impl Note {
                     if tag.len() == 1 {
                         return Err(FileError::Parse {
                             msg: "Empty tags are invalid.".into(),
-                            data: "@".into()
+                            data: "@".into(),
+                            line: line_num,
                         });
                     }
 
@@ -287,7 +296,8 @@ impl Note {
                 } else {
                     return Err(FileError::Parse {
                         msg: "Tag is missing the '@' symbol".into(),
-                        data: tag.into()
+                        data: tag.into(),
+                        line: line_num,
                     });
                 }
             }
@@ -300,7 +310,8 @@ impl Note {
             if line.find(banned).is_some() {
                 return Err(FileError::Parse {
                     msg: "Key-value pairs cannot contain '[' or ']'".into(),
-                    data: line.into()
+                    data: line.into(),
+                    line: line_num,
                 });
             }
 
@@ -314,14 +325,16 @@ impl Note {
                 None => {
                     Err(FileError::Parse {
                         msg: "Invalid key/value metadata line".into(),
-                        data: line.into()
+                        data: line.into(),
+                        line: line_num,
                     })
                 },
             }
         } else {
             Err(FileError::Parse {
                 msg: "Invalid metadata object".into(),
-                data: line.into()
+                data: line.into(),
+                line: line_num,
             })
         }
     }
@@ -343,7 +356,7 @@ mod tests {
     #[test]
     fn read_tag_meta_line() {
         if let Metadata::Tag(vs) =
-            Note::read_metadata_line("@some-tag\n").unwrap()
+            Note::read_metadata_line("@some-tag\n", 1).unwrap()
         {
             assert_eq!(vs.len(), 1);
             assert_eq!(vs[0], "@some-tag");
@@ -355,7 +368,7 @@ mod tests {
     #[test]
     fn read_multiple_tags_meta_line() {
         if let Metadata::Tag(vs)=
-            Note::read_metadata_line("@some-tag @other-tag\n").unwrap()
+            Note::read_metadata_line("@some-tag @other-tag\n", 1).unwrap()
         {
             assert_eq!(vs.len(), 2);
             assert_eq!(vs[0], "@some-tag");
@@ -367,13 +380,13 @@ mod tests {
 
     #[test]
     fn tags_must_be_prefixed_with_symbol() {
-        assert!(Note::read_metadata_line("@some tag\n").is_err());
+        assert!(Note::read_metadata_line("@some tag\n", 1).is_err());
     }
 
     #[test]
     fn read_key_value_meta_line() {
         if let Metadata::KV(k, v) =
-            Note::read_metadata_line("[Key: Value]\n").unwrap()
+            Note::read_metadata_line("[Key: Value]\n", 1).unwrap()
         {
             assert_eq!(k, "Key");
             assert_eq!(v, "Value");
@@ -382,7 +395,7 @@ mod tests {
 
     #[test]
     fn only_one_kv_is_on_a_line() {
-        assert!(Note::read_metadata_line("[k:v] [k:v]\n").is_err());
+        assert!(Note::read_metadata_line("[k:v] [k:v]\n", 1).is_err());
     }
 
     #[test]

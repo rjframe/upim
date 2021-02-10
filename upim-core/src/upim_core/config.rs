@@ -156,12 +156,14 @@ impl Config {
         let f = File::open(path)?;
         let mut reader = BufReader::new(f);
         let mut line = String::new();
+        let mut cnt = 0;
 
         let mut map = HashMap::new();
         let mut group = String::from("DEFAULT");
 
         // TODO: Track line numbers for error messages.
         while reader.read_line(&mut line)? > 0 {
+            cnt += 1;
             line = line.trim().into();
             if line.is_empty() { continue; }
 
@@ -174,7 +176,8 @@ impl Config {
                 } else {
                     return Err(FileError::Parse {
                         msg: "Missing closing bracket for group name".into(),
-                        data: line
+                        data: line,
+                        line: cnt,
                     });
                 }
             } else if let Some((var, val)) = line.split_once('=') {
@@ -185,7 +188,8 @@ impl Config {
             } else {
                 return Err(FileError::Parse {
                     msg: "Expected a variable assignment".into(),
-                    data: line
+                    data: line,
+                    line: cnt,
                 });
             }
             line.clear();

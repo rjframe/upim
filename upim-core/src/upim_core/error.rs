@@ -11,15 +11,15 @@ use std::{
 #[derive(Debug)]
 pub enum FileError {
     IO(io::Error),
-    Parse { msg: String, data: String },
+    Parse { msg: String, data: String, line: u32 },
 }
 
 impl fmt::Display for FileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             FileError::IO(ref e) => e.fmt(f),
-            FileError::Parse { ref msg, ref data } =>
-                write!(f, "{}:\n\t{}", msg, data),
+            FileError::Parse { ref msg, ref data, ref line } =>
+                write!(f, "{} at line {}:\n\t{}", msg, line, data),
         }
     }
 }
