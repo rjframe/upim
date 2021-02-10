@@ -80,12 +80,16 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: Option<&str>) {
 fn main() -> anyhow::Result<()> {
     let options = Options::from_args(env::args());
     let options = if let Ok(opt) = options {
-        // TODO: Handle --help
         opt
     } else {
         print_usage();
         return Ok(());
     };
+
+    if options.action == Action::PrintHelp {
+        print_usage();
+        return Ok(());
+    }
 
     let conf = {
         let path = options.conf_path.or_else(find_default_configuration);
@@ -150,6 +154,10 @@ fn main() -> anyhow::Result<()> {
                 println!("{}:{}", k, v);
             }
         },
+        Action::PrintHelp => {
+            // we printed above, prior to reading the configuration file.
+            panic!();
+        },
     }
 
     Ok(())
@@ -193,6 +201,7 @@ enum Action {
     RemoveAttribute(String),
     PrintTags,
     PrintAttributes,
+    PrintHelp,
 }
 
 impl Default for Action {
@@ -288,6 +297,10 @@ impl Options {
                     opts.action = Action::RemoveAttribute(args[1].clone());
                     args = &args[2..args.len()];
                 },
+                "--help" => {
+                    opts.action = Action::PrintHelp;
+                    break;
+                },
                 _ => {
                     opts.file = PathBuf::from(&args[0]);
                     if args.len() > 1 {
@@ -310,7 +323,7 @@ impl Options {
     }
 
     fn is_valid(&self) -> bool {
-        self.file != PathBuf::default() &&
+        self.action == Action::PrintHelp || self.file != PathBuf::default() &&
         if self.collection.is_some() {
             ! self.file.is_absolute()
         } else {
