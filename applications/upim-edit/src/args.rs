@@ -17,6 +17,7 @@ pub enum Action {
     RemoveAttribute(String),
     PrintTags,
     PrintAttributes,
+    PrintContent,
     PrintHelp,
 }
 
@@ -78,6 +79,10 @@ impl Options {
                 },
                 "--attributes" => {
                     opts.action = Action::PrintAttributes;
+                    args = &args[1..args.len()];
+                },
+                "--content" => {
+                    opts.action = Action::PrintContent;
                     args = &args[1..args.len()];
                 },
                 "--add-tags" => {
@@ -242,6 +247,17 @@ mod tests {
         let opts = Options::new(&args).unwrap();
         assert_eq!(opts.file.to_str().unwrap(), "/tmp/some-file.txt");
         assert_eq!(opts.action, Action::PrintAttributes);
+    }
+
+    #[test]
+    fn args_content() {
+        let args = vec!["upim-edit".into(),
+            "--content".into(), "/tmp/some-file.txt".into()
+        ];
+
+        let opts = Options::new(&args).unwrap();
+        assert_eq!(opts.file.to_str().unwrap(), "/tmp/some-file.txt");
+        assert_eq!(opts.action, Action::PrintContent);
     }
 
     #[test]

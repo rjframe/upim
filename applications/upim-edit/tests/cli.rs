@@ -182,3 +182,20 @@ fn list_attributes() {
 
     remove_file(path).unwrap();
 }
+
+#[test]
+fn print_content() {
+    let (path, _) = temp_file_with("\
+    @tag\n\
+    [key: value]\n\
+    \n\
+    Some content.\nSecond line.\n\
+    ");
+
+    let output = exec(UPIM_EDIT, &["--content", path.to_str().unwrap()]);
+    let output = str::from_utf8(&output.stdout).unwrap();
+
+    assert_eq!(output, "Some content.\nSecond line.\n\n");
+
+    remove_file(path).unwrap();
+}

@@ -291,6 +291,10 @@ impl Note {
         kv
     }
 
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
 
     fn read_metadata_line(line: &str, line_num: u32,)
     -> Result<Metadata, FileError> {
