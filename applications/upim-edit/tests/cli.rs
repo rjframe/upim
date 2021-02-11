@@ -70,7 +70,7 @@ fn add_tags_to_file() {
 
     exec(UPIM_EDIT, &["--add-tags", "@tag3", "@tag4", path.to_str().unwrap()]);
 
-    let note = Note::read_from_file(path.to_str().unwrap()).unwrap();
+    let note = Note::read_header(&path).unwrap();
 
     assert!(note.contains_tag("@tag1"));
     assert!(note.contains_tag("@tag2"));
@@ -92,7 +92,7 @@ fn remove_tags() {
         &["--remove-tags", "@tag3", "@tag4", path.to_str().unwrap()]
     );
 
-    let note = Note::read_from_file(path.to_str().unwrap()).unwrap();
+    let note = Note::read_header(&path).unwrap();
 
     assert!(note.contains_tag("@tag1"));
     assert!(note.contains_tag("@tag2"));
@@ -130,7 +130,7 @@ fn add_attribute_to_file() {
 
     exec(UPIM_EDIT, &["--add-attr", "key3", "value3", path.to_str().unwrap()]);
 
-    let note = Note::read_from_file(path.to_str().unwrap()).unwrap();
+    let note = Note::read_header(&path).unwrap();
 
     assert_eq!(note["key1"], "value1");
     assert_eq!(note["key2"], "value2");
@@ -152,7 +152,7 @@ fn remove_attribute() {
 
     exec(UPIM_EDIT, &["--remove-attr", "key2", path.to_str().unwrap()]);
 
-    let note = Note::read_from_file(path.to_str().unwrap()).unwrap();
+    let note = Note::read_header(&path).unwrap();
 
     assert_eq!(note["key1"], "value1");
     assert_eq!(note["key3"], "value3");

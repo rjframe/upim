@@ -48,7 +48,7 @@ use std::{
     fs::File,
     io::Write,
     ops::{Index, IndexMut},
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
 };
 
@@ -127,8 +127,6 @@ impl IndexMut<&str> for Note {
 }
 
 impl Note {
-    // TODO: Add a read_header() method?
-
     pub fn new(tags: &[String], map: HashMap<String, String>, text: &str)
     -> Self {
         Self {
@@ -175,6 +173,30 @@ impl Note {
         }
 
         reader.read_to_string(&mut note.content)?;
+
+        Ok(note)
+    }
+
+    /// Read a Note header from a file.
+    ///
+    /// Returns a [Note] with an empty content field.
+    pub fn read_header(path: &Path) -> Result<Self, FileError> {
+        use std::io::{prelude::*, BufReader};
+
+        let mut note = Note::default();
+        let mut reader = BufReader::new(File::open(path)?);
+        let mut line = String::new();
+        let mut cnt = 0;
+
+        while reader.read_line(&mut line)? > 1 {
+            cnt += 1;
+
+            match Self::read_metadata_line(&line, cnt)? {
+                Metadata::Tag(mut vs) => { note.tags.append(&mut vs); },
+                Metadata::KV(k, v) => { note.map.insert(k, v); },
+            }
+            line.clear();
+        }
 
         Ok(note)
     }
