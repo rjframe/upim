@@ -76,9 +76,7 @@ pub fn read_upim_configuration() -> Result<Config, Config> {
 
     // TODO: we'll want .iter().try_for_each().collect::Result<...>() instead.
     for file in conf_files.iter() {
-        let c = Config::read_from_file(file.to_str().unwrap_or_default());
-
-        if let Ok(c) = c {
+        if let Ok(c) = Config::read_from_file(file) {
             conf = conf.merge_with(c);
         } else {
             err_occured = true;
@@ -150,7 +148,7 @@ pub struct Config {
 
 impl Config {
     /// Read a [Config] from the INI file at the path specified.
-    pub fn read_from_file(path: &str) -> Result<Self, FileError> {
+    pub fn read_from_file(path: &Path) -> Result<Self, FileError> {
         use std::{
             fs::File,
             io::{prelude::*, BufReader},
@@ -216,13 +214,16 @@ impl Config {
     /// reading a configuration:
     ///
     /// ```
+    /// use std::path::Path;
     /// use upim_core::Config;
     ///
     /// // If test.ini includes `var1 = val1` but does not have `some-var`:
     /// let conf = Config::default()
     ///     .set("DEFAULT", "var1", "default value")
     ///     .set("DEFAULT", "some-var", "my-value")
-    ///     .merge_with(Config::read_from_file("test/test.ini").unwrap());
+    ///     .merge_with(
+    ///         Config::read_from_file(Path::new("test/test.ini")).unwrap()
+    ///     );
     ///
     /// assert_eq!(conf["var1"], "val1");
     /// assert_eq!(conf["some-var"], "my-value");
@@ -410,7 +411,7 @@ mod tests {
 
     #[test]
     fn parse_variables() {
-        let conf = Config::read_from_file("test/test.ini").unwrap();
+        let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap();
 
         assert_eq!(conf[("DEFAULT", "var1")], "val1");
         assert_eq!(conf[("Group A", "var2")], "value two");
@@ -419,8 +420,9 @@ mod tests {
 
     #[test]
     fn merge_configs() {
-        let conf = Config::read_from_file("test/test.ini").unwrap()
-            .merge_with(Config::read_from_file("test/test2.ini").unwrap());
+        let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap()
+            .merge_with(Config::read_from_file(Path::new("test/test2.ini"))
+                .unwrap());
 
         assert_eq!(conf[("DEFAULT", "var1")], "val1");
         assert_eq!(conf[("Group A", "var2")], "value two");
@@ -429,7 +431,7 @@ mod tests {
 
     #[test]
     fn get_default_group() {
-        let conf = Config::read_from_file("test/test.ini").unwrap();
+        let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap();
 
         assert_eq!(conf.get_default("var1"), Some(&"val1".to_string()));
         assert_eq!(conf.get_default("nothing"), None);
@@ -437,7 +439,7 @@ mod tests {
 
     #[test]
     fn get_group() {
-        let conf = Config::read_from_file("test/test.ini").unwrap();
+        let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap();
 
         assert_eq!(conf.get("Group A", "var2"), Some(&"value two".to_string()));
         assert_eq!(conf.get("Group A", "var1"), None);
@@ -448,7 +450,8 @@ mod tests {
         let conf = Config::default()
             .set_default("var1", "default value")
             .set_default("some-var", "my-value")
-            .merge_with(Config::read_from_file("test/test.ini").unwrap());
+            .merge_with(Config::read_from_file(Path::new("test/test.ini"))
+                .unwrap());
 
         assert_eq!(conf["var1"], "val1");
         assert_eq!(conf["some-var"], "my-value");

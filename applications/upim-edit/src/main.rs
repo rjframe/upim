@@ -42,7 +42,7 @@
 mod args;
 
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     env,
 };
 
@@ -74,7 +74,7 @@ fn main() -> anyhow::Result<()> {
         let path = options.conf_path.or_else(find_default_configuration);
 
         if let Some(path) = path {
-            read_config(path.to_str().unwrap())?
+            read_config(&path)?
         } else {
             // TODO: If we can determine the editor from the environment we
             // currently don't need a configuration file.
@@ -241,7 +241,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
 /// # Arguments
 ///
 /// * path - The path of the upim-edit configuration file.
-fn read_config(path: &str) -> anyhow::Result<Config> {
+fn read_config(path: &Path) -> anyhow::Result<Config> {
     let mut conf = Config::read_from_file(path)?;
 
     if conf.get_default("editor").is_none() {
