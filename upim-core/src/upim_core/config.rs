@@ -161,7 +161,6 @@ impl Config {
         let mut map = HashMap::new();
         let mut group = String::from("DEFAULT");
 
-        // TODO: Track line numbers for error messages.
         while reader.read_line(&mut line)? > 0 {
             cnt += 1;
             line = line.trim().into();
