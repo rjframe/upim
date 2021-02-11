@@ -221,7 +221,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
         let res = Note::validate_header(&path);
         if let Err(e) = res {
             // TODO: Offer to re-open to fix.
-            Err(e)?
+            Err(e.into())
         } else {
             Ok(())
         }

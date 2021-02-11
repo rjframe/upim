@@ -91,6 +91,8 @@ impl FromStr for Note {
         let mut lines = s.split_inclusive('\n');
         let mut cnt = 0;
 
+        // Don't want to fight the borrow checker over ownership of `lines`.
+        #[allow(clippy::explicit_counter_loop)]
         for line in &mut lines {
             cnt += 1;
             if line == "\n" { break; }
@@ -127,11 +129,11 @@ impl IndexMut<&str> for Note {
 }
 
 impl Note {
-    pub fn new(tags: &[String], map: HashMap<String, String>, text: &str)
+    pub fn new(tags: &[String], attrs: HashMap<String, String>, text: &str)
     -> Self {
         Self {
             tags: tags.into(),
-            map: map,
+            map: attrs,
             content: text.into(),
         }
     }
