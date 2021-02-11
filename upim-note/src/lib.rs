@@ -351,8 +351,6 @@ enum Metadata {
 mod tests {
     use super::*;
 
-    // TODO: Sandbox to test reading and writing notes.
-
     #[test]
     fn read_tag_meta_line() {
         if let Metadata::Tag(vs) =
