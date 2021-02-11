@@ -257,17 +257,15 @@ impl Config {
             .collect()
     }
 
-    // TODO: Rename these: get_default and get to match the sets:
-
     /// Retrieve the value of the specified variable within the DEFAULT group,
     /// or `None` if it is not set.
-    pub fn get(&self, variable: &str) -> Option<&String> {
+    pub fn get_default(&self, variable: &str) -> Option<&String> {
         self.values.get(&("DEFAULT".into(), variable.into()))
     }
 
     /// Retrieve the value of the specified variable within the specified group,
     /// or `None` if it is not set.
-    pub fn get_group(&self, group: &str, variable: &str) -> Option<&String> {
+    pub fn get(&self, group: &str, variable: &str) -> Option<&String> {
         self.values.get(&(group.into(), variable.into()))
     }
 }
@@ -432,19 +430,16 @@ mod tests {
     fn get_default_group() {
         let conf = Config::read_from_file("test/test.ini").unwrap();
 
-        assert_eq!(conf.get("var1"), Some(&"val1".to_string()));
-        assert_eq!(conf.get("nothing"), None);
+        assert_eq!(conf.get_default("var1"), Some(&"val1".to_string()));
+        assert_eq!(conf.get_default("nothing"), None);
     }
 
     #[test]
     fn get_group() {
         let conf = Config::read_from_file("test/test.ini").unwrap();
 
-        assert_eq!(
-            conf.get_group("Group A", "var2"),
-            Some(&"value two".to_string())
-        );
-        assert_eq!(conf.get_group("Group A", "var1"), None);
+        assert_eq!(conf.get("Group A", "var2"), Some(&"value two".to_string()));
+        assert_eq!(conf.get("Group A", "var1"), None);
     }
 
     #[test]

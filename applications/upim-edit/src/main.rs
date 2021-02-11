@@ -84,8 +84,8 @@ fn main() -> anyhow::Result<()> {
 
     match options.action {
         Action::Edit => {
-            let editor = conf.get("editor").expect("No text editor set");
-            let editor_arg = conf.get("editor_arg").map(|v| v.as_str());
+            let editor = conf.get_default("editor").expect("No text editor set");
+            let editor_arg = conf.get_default("editor_arg").map(|v| v.as_str());
             launch_editor(editor, editor_arg, &options.file)?;
         },
         Action::AddTags(tags) => {
@@ -245,7 +245,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
 fn read_config(path: &str) -> anyhow::Result<Config> {
     let mut conf = Config::read_from_file(path)?;
 
-    if conf.get("editor").is_none() {
+    if conf.get_default("editor").is_none() {
         let editor = env::var_os("EDITOR").map(|e| e.into_string());
 
         if let Some(editor) = editor {
@@ -261,8 +261,8 @@ fn read_config(path: &str) -> anyhow::Result<Config> {
         }
     }
 
-    if conf.get("editor_arg").is_none() {
-        let editor = conf.get("editor").unwrap();
+    if conf.get_default("editor_arg").is_none() {
+        let editor = conf.get_default("editor").unwrap();
 
         // If we know what argument an editor needs to tell it to run in the
         // foreground, we add it here; otherwise assume nothing is necessary.
@@ -274,12 +274,12 @@ fn read_config(path: &str) -> anyhow::Result<Config> {
     // TODO: Once I can inspect errors, do so.
     let global = read_upim_configuration().unwrap();
 
-    if let Some(folder) = global.get("template_folder") {
+    if let Some(folder) = global.get_default("template_folder") {
         conf = conf.set_default("template_folder", folder);
     };
 
     for coll in global.variables_in_group("Collections").iter() {
-        if conf.get_group("Collections", &coll).is_none() {
+        if conf.get("Collections", &coll).is_none() {
             conf = conf.set(
                 "Collections",
                 &coll,
