@@ -153,8 +153,7 @@ impl Note {
         Ok(())
     }
 
-    // TODO: Use PathBuf
-    pub fn read_from_file(path: &str) -> Result<Self, FileError> {
+    pub fn read_from_file(path: &Path) -> Result<Self, FileError> {
         use std::io::{prelude::*, BufReader};
 
         let mut note = Note::default();
@@ -201,8 +200,7 @@ impl Note {
         Ok(note)
     }
 
-    // TODO: Use PathBuf
-    pub fn write_to_file(&self, path: &str) -> std::io::Result<()> {
+    pub fn write_to_file(&self, path: &Path) -> std::io::Result<()> {
         let mut file = File::create(path)?;
 
         for tag in &self.tags {

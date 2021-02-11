@@ -89,44 +89,38 @@ fn main() -> anyhow::Result<()> {
             launch_editor(editor, editor_arg, &options.file)?;
         },
         Action::AddTags(tags) => {
-            let file = options.file.to_str().unwrap();
-            let mut note = Note::read_from_file(file)?;
+            let mut note = Note::read_from_file(&options.file)?;
 
             for tag in &tags { note.insert_tag(tag); }
-            note.write_to_file(file)?;
+            note.write_to_file(&options.file)?;
         },
         Action::AddAttribute(ref k, ref v) => {
-            let file = options.file.to_str().unwrap();
-            let mut note = Note::read_from_file(file)?;
+            let mut note = Note::read_from_file(&options.file)?;
 
             note.set_attribute(k, v);
-            note.write_to_file(file)?;
+            note.write_to_file(&options.file)?;
         },
         Action::RemoveTags(tags) => {
-            let file = options.file.to_str().unwrap();
-            let mut note = Note::read_from_file(file)?;
+            let mut note = Note::read_from_file(&options.file)?;
 
             for tag in &tags { note.remove_tag(tag); }
-            note.write_to_file(file)?;
+            note.write_to_file(&options.file)?;
         },
         Action::RemoveAttribute(ref k) => {
-            let file = options.file.to_str().unwrap();
-            let mut note = Note::read_from_file(file)?;
+            let mut note = Note::read_from_file(&options.file)?;
 
             note.remove_attribute(k);
-            note.write_to_file(file)?;
+            note.write_to_file(&options.file)?;
         },
         Action::PrintTags => {
-            let file = options.file.to_str().unwrap();
-            let note = Note::read_from_file(file)?;
+            let note = Note::read_from_file(&options.file)?;
 
             for tag in note.tags().iter() {
                 println!("{}", tag);
             }
         },
         Action::PrintAttributes => {
-            let file = options.file.to_str().unwrap();
-            let note = Note::read_from_file(file)?;
+            let note = Note::read_from_file(&options.file)?;
 
             for (k, v) in note.attributes().iter() {
                 println!("{}:{}", k, v);
