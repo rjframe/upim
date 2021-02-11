@@ -27,7 +27,10 @@ use std::{
     env,
 };
 
-use super::error::FileError;
+use super::{
+    error::FileError,
+    uniq::Uniq,
+};
 
 
 // TODO: Write to file.
@@ -242,12 +245,10 @@ impl Config {
     // TODO: Vec<&str>? Iterator?
     /// Get the list of groups in the configuration file.
     pub fn groups(&self) -> Vec<String> {
-        // TODO: needs to be unique
-        self.values.keys().map(|k| k.0.clone()).collect()
+        self.values.keys().uniq().map(|k| k.0.clone()).collect()
     }
 
-    // TODO: Vec<&str>? Iterator?
-    // TODO: Return var/val pair iterator?
+    // TODO: Vec<&str>? Iterator? var/val pair iterator?
     /// Get the list of variables set in the specified group.
     pub fn variables_in_group(&self, group: &str) -> Vec<String> {
         self.values.keys()
