@@ -113,14 +113,14 @@ fn main() -> anyhow::Result<()> {
             note.write_to_file(&options.file)?;
         },
         Action::PrintTags => {
-            let note = Note::read_from_file(&options.file)?;
+            let note = Note::read_header(&options.file)?;
 
             for tag in note.tags().iter() {
                 println!("{}", tag);
             }
         },
         Action::PrintAttributes => {
-            let note = Note::read_from_file(&options.file)?;
+            let note = Note::read_header(&options.file)?;
 
             for (k, v) in note.attributes().iter() {
                 println!("{}:{}", k, v);
