@@ -446,6 +446,13 @@ mod tests {
     }
 
     #[test]
+    fn get_nonexistent_group_is_none() {
+        let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap();
+
+        assert!(conf.get("Not a group", "var1").is_none());
+    }
+
+    #[test]
     fn set_default_values() {
         let conf = Config::default()
             .set_default("var1", "default value")
