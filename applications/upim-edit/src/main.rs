@@ -29,6 +29,8 @@
 // editor = command
 // editor_arg = arg
 //
+// ; template_folder from global is overrideable
+//
 // ; These override the others; most useful in CWD
 // [Collections]
 // <name> = /path/to/collection/folder
@@ -284,9 +286,11 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
     // TODO: Once I can inspect errors, do so.
     let global = read_upim_configuration().unwrap();
 
-    if let Some(folder) = global.get_default("template_folder") {
-        conf = conf.set_default("template_folder", folder);
-    };
+    if conf.get_default("template_folder").is_none() {
+        if let Some(folder) = global.get_default("template_folder") {
+            conf = conf.set_default("template_folder", folder);
+        };
+    }
 
     for coll in global.variables_in_group("Collections").iter() {
         if conf.get("Collections", &coll).is_none() {
