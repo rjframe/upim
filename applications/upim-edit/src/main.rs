@@ -270,6 +270,12 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
         };
     }
 
+    if conf.get_default("collection_base").is_none() {
+        if let Some(folder) = global.get_default("collection_base") {
+            conf = conf.set_default("template_folder", folder);
+        };
+    }
+
     for coll in global.variables_in_group("Collections").iter() {
         if conf.get("Collections", &coll).is_none() {
             conf = conf.set(
@@ -329,6 +335,24 @@ fn determine_file_path(options: &Options, conf: &Config)
 
         let mut path = PathBuf::from(path);
         path.push(&options.file);
+
+        let path = if path.is_relative() {
+            match conf.get_default("collection_base") {
+                Some(base) => {
+                    let mut base = PathBuf::from(base);
+                    base.push(path);
+                    base
+                },
+                None => {
+                    return Err(anyhow!(
+                        "Relative collection paths are not supported if \
+                        collection_base is unset"
+                    ));
+                },
+            }
+        } else {
+            path
+        };
 
         if path.exists() {
             Ok((path, None))
