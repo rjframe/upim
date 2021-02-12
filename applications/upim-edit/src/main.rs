@@ -46,6 +46,7 @@ mod args;
 use std::{
     path::{Path, PathBuf},
     env,
+    fs,
 };
 
 use upim_core::config::*;
@@ -73,7 +74,8 @@ fn main() -> anyhow::Result<()> {
     }
 
     let conf = {
-        let path = options.conf_path.or_else(find_default_configuration);
+        let path = options.conf_path.clone() // Clone to avoid partial move.
+            .or_else(find_default_configuration);
 
         if let Some(path) = path {
             read_config(&path)?
@@ -88,7 +90,13 @@ fn main() -> anyhow::Result<()> {
         Action::Edit => {
             let editor = conf.get_default("editor").expect("No text editor set");
             let editor_arg = conf.get_default("editor_arg").map(|v| v.as_str());
-            launch_editor(editor, editor_arg, &options.file)?;
+            let (path, templ) = determine_file_path(&options, &conf)?;
+
+            if let Some(templ) = templ {
+                fs::copy(templ, &path)?;
+            };
+
+            launch_editor(editor, editor_arg, &path)?;
         },
         Action::AddTags(tags) => {
             let mut note = Note::read_from_file(&options.file)?;
@@ -185,7 +193,6 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
     use std::{
         process::Command,
         time::SystemTime,
-        fs,
         io::{self, Write},
     };
 
@@ -321,4 +328,59 @@ fn find_default_configuration() -> Option<PathBuf> {
             p.push(filename);
             p.exists().then_some(p.clone())
         })
+}
+
+/// Determine the path of the file to create or edit based on the specified
+/// collection.
+///
+/// # Returns
+///
+/// The path to the file to open, and if it is to be created from a template,
+/// the path of the template to copy.
+///
+/// Returns an error if a collection is specified but an absolute path was given
+/// on the command-line.
+fn determine_file_path(options: &Options, conf: &Config)
+-> anyhow::Result<(PathBuf, Option<PathBuf>)> {
+    let coll = match &options.collection {
+        Some(c) => c,
+        None => { return Ok((options.file.clone(), None)); },
+    };
+
+    if options.file.is_absolute() {
+        return Err(
+            anyhow!("Cannot specify an absolute path with a collection"));
+    }
+
+    if let Some(path) = conf.get("Collections", &coll) {
+        // We need to use the collection directory to generate the file's
+        // absolute path.
+
+        let mut path = PathBuf::from(path);
+        path.push(&options.file);
+
+        if path.exists() {
+            Ok((path, None))
+        } else {
+            // We're creating the file, so need the path to the template if one
+            // exists.
+
+            if let Some(templ) = conf.get_default("template_folder") {
+                let mut templ = PathBuf::from(templ);
+                templ.push(&coll);
+                templ.set_extension("template");
+
+                if templ.exists() {
+                    Ok((path, Some(templ)))
+                } else {
+                    Ok((path, None))
+                }
+            } else {
+                Ok((path, None))
+            }
+        }
+    } else {
+        // The collection is not defined.
+        Err(anyhow!("Unknown collection - {}", coll))
+    }
 }
