@@ -9,35 +9,6 @@
 #![feature(bool_to_option)]
 #![feature(drain_filter)]
 
-// upim config file:
-//
-// ---
-// ; if not present, only blank files are created.
-// template_folder = /path/to/collections/template/folder
-//
-// [Collections]
-// <name> = /path/to/collection/folder
-// <name> = /path/to/collection/folder
-// <name> = /path/to/collection/folder
-// ---
-//
-// upim-edit config file:
-//
-// ---
-// [DEFAULT]
-//
-// editor = command
-// editor_arg = arg
-//
-// ; template_folder from global is overrideable
-//
-// ; These override the others; most useful in CWD
-// [Collections]
-// <name> = /path/to/collection/folder
-// <name> = /path/to/collection/folder
-// <name> = /path/to/collection/folder
-// ---
-
 // TODO: Instead of defaulting to vim, try the system's associated editor for
 // the file type first?
 
