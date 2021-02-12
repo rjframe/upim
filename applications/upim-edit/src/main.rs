@@ -184,6 +184,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
         process::Command,
         time::SystemTime,
         fs,
+        io::{self, Write},
     };
 
     let mut args = vec![];
@@ -219,14 +220,24 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
         SystemTime::now()
     };
 
-    // See if we need to validate the note. We assume that it was valid when it
-    // was opened, so only need to check it if it's been modified. We also
-    // assume that the note content is valid UTF-8. TODO: Check that?
+    // We assume the note was valid when opened, so we only need to perform
+    // validation if it's been modified. We only validate the header -- we
+    // assume the document is properly-encoded UTF-8.
     if maybe_modified != last_modified {
-        let res = Note::validate_header(&path);
-        if let Err(e) = res {
-            // TODO: Offer to re-open to fix.
-            Err(e.into())
+        if let Err(e) = Note::validate_header(&path) {
+            println!("Error validating note. {}", e);
+            io::stdout().write_all(
+                b"Would you like to re-open the file to fix? [Y/n] "
+            )?;
+            io::stdout().flush()?;
+
+            let mut inp = String::new();
+            io::stdin().read_line(&mut inp)?;
+
+            match inp.trim() {
+                "" | "y" | "Y" => launch_editor(editor, arg, path),
+                _ => Err(e.into()),
+            }
         } else {
             Ok(())
         }
