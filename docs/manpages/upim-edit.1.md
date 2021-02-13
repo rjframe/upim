@@ -1,0 +1,187 @@
+% UPIM-EDIT(1) upim-edit manual 0.1.0-prerelease
+% Ryan Frame (code@ryanjframe.com)
+% 2021 February
+
+# NAME
+
+upim-edit - manage uPIM Notes
+
+
+# SYNOPSIS
+
+**upim-edit** [*OPTION*...] *FILE*
+
+
+# DESCRIPTION
+
+uPIM is a collection of libraries and applications to form the building blocks
+for a personal information management system.
+
+upim-edit provides note management functions, such as adding or removing tags
+and attributes. It can also wrap your system text editor for convenient editing
+of files within collections, and will validate the note's header upon exit.
+
+
+## Notes
+
+uPIM notes are UTF-8 encoded files that contain a header, a blank line, then
+optionally a textual document. The header contains zero or more tags and
+attributes.
+
+A tag is a string beginning with '@', such as "@apple" or "@some-tag". Tags may
+contain any sequence of UTF-8 character codes except space (' '). Multiple tags
+may exist on a line.
+
+Attributes are key-value pairs on a single line, separated by a colon (':') and
+enclosed in square brackets ('[' and ']'); such as "[key: value]". An
+attribute's key cannot contain a colon, and neither the key nor value may
+contain a square bracket; all other sequences of UTF-8 code points are allowed.
+Only one attribute is allowed on a single line, and no tags may share a line
+with an attribute.
+
+A note with an empty header simply begins with a blank line.
+
+This format can easily support many types of information:
+
+* Diary/journal entries
+* Travel plans/iteneraries
+* Recipes
+* Lists (books to read, TODO lists, etc.)
+* Many other types of structured or semi-structured data
+
+
+### Note Template
+
+A note template is a note saved to the templates folder specified by the global
+uPIM configuration, with a ".template" extension. When creating a note in a
+collection, the new note will be created from the template for that collection.
+
+
+# OPTIONS
+
+**-C** *COLLECTION-NAME*
+: Create or edit a note in the specified collection
+
+**\-\-conf** *PATH*
+: Use the specified configuration file instead of the standard one. The global
+  uPIM configuration file is still read
+
+**\-\-tags**
+: Print the note's tags then exit
+
+**\-\-attributes**
+: Print the note's attributes then exit
+
+**\-\-content**
+: Print the content (document) portion of the note to standard output then exit
+
+**\-\-add-tags** *TAG*...
+: Add one or more tags to the note, separated by spaces, then exit
+
+**\-\-add-attr** *KEY* *VALUE*
+: Add the key-value pair to the note's attributes then exit
+
+**\-\-remove-tag** *TAG*
+: Remove the tag from the note if present then exit
+
+**\-\-remove-attr** *KEY*
+: Remove the attribute with the specified key, if present, then exit
+
+**\-\-help**
+: Print a short help message
+
+
+# CONFIGURATION
+
+upim-edit uses the global uPIM configuration to find collections and load note
+templates for the relevant collection.
+
+In addition, upim-edit searches for the following configuration files, in order:
+
+1. /etc/upim/upim-edit.conf
+2. $XDG_CONFIG_HOME/upim/upim.conf if $XDG_CONFIG_HOME is defined; otherwise
+   $HOME/.config/upim/upim.conf
+3. (current working directory)/.upim.conf
+
+A upim-edit configuration file must exist, though it may be empty if $EDITOR is
+set. The upim-edit.conf file may define new collections, override global
+collections, and override the global template folder. See **upim.conf**(5) for
+more information.
+
+
+# ENVIRONMENT
+
+upim-edit will launch the executable named by $EDITOR, if set.
+
+
+# EXIT STATUS
+
+Returns 0 on success, 1 on failure.
+
+
+# EXAMPLES
+
+## Example Note Template
+
+A note template is a partial (and possibly-invalid) note that functions as a
+form for new notes within a collection. A template for the Contacts collection
+may look something like this:
+
+```
+@
+[Name: ]
+[Spouse: ]
+[Children: ]
+[Work phone: ]
+[Cell phone: ]
+[Address: ]
+```
+
+When creating a new note in the Contacts group, the editor will be pre-filled
+with the contents of the template.
+
+|       $ **upim-edit** -C Contacts Favorite-Person.contact
+
+
+## Example Note
+
+Given the following recipe as a markdown document in the "Recipes" collection,
+and named "favorite-food.md":
+
+```md
+@low-fat
+[Name: My Favorite Food]
+[Author: Some Person]
+[Prep time: 5 minutes, maybe a few days]
+
+# My Favorite Food
+
+This is a great meal to serve for guests.
+
+## Ingredients
+
+* Water
+* Salt
+
+## Instructions
+
+Mix the water and salt together. Let dry.
+```
+
+Add a "@low-carb" tag:
+
+|       $ **upim-edit** -C Recipes \-\-add-tag @low-carb favorite-food.md
+
+Use pandoc to convert the recipe to html:
+
+|       $ **upim-edit** -C Recipes \-\-document favorite-food.md \
+|           | pandoc -s -t html -o favorite-food.html
+
+Edit the recipe using $EDITOR:
+
+|       $ **upim-edit** -C Recipes favorite-food.md
+
+
+# SEE ALSO
+
+**upim.conf**(5), **upim**(7)
