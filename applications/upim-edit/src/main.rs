@@ -194,36 +194,34 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
         .spawn()?
         .wait()?;
 
-    let maybe_modified = if path.exists() {
+    let was_not_modified = if path.exists() {
         fs::metadata(&path)?.modified().unwrap_or_else(|_| SystemTime::now())
     } else {
         SystemTime::now()
-    };
+    } == last_modified;
 
     // We assume the note was valid when opened, so we only need to perform
     // validation if it's been modified. We only validate the header -- we
     // assume the document is properly-encoded UTF-8.
-    if maybe_modified != last_modified {
-        if let Err(e) = Note::validate_header(&path) {
-            println!("Error validating note. {}", e);
-            io::stdout().write_all(
-                b"Would you like to re-open the file to fix? [Y/n] "
-            )?;
-            io::stdout().flush()?;
-
-            let mut inp = String::new();
-            io::stdin().read_line(&mut inp)?;
-
-            match inp.trim() {
-                "" | "y" | "Y" => launch_editor(editor, arg, path),
-                _ => Err(e.into()),
-            }
-        } else {
-            Ok(())
-        }
-    } else {
-        // File wasn't saved. Do nothing.
+    if was_not_modified {
         Ok(())
+    } else {
+        match Note::validate_header(&path) {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                println!("Error validating note. {}", e);
+                print!("Would you like to re-open the file to fix? [Y/n] ");
+                io::stdout().flush()?;
+
+                let mut inp = String::new();
+                io::stdin().read_line(&mut inp)?;
+
+                match inp.trim() {
+                    "" | "y" | "Y" => launch_editor(editor, arg, path),
+                    _ => Err(e.into()),
+                }
+            },
+        }
     }
 }
 
