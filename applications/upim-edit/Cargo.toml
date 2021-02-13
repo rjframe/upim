@@ -2,6 +2,7 @@
 name = "upim-edit"
 version = "0.1.0"
 authors = ["Ryan Frame <code@ryanjframe.com>"]
+license = "MPL-2.0"
 edition = "2018"
 
 [dependencies]
