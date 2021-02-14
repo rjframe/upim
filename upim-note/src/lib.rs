@@ -155,6 +155,7 @@ impl Note {
         Ok(())
     }
 
+    /// Read the file at the given path and parse it as a `Note`.
     pub fn read_from_file(path: &Path) -> Result<Self, FileError> {
         use std::io::{prelude::*, BufReader};
 
@@ -202,6 +203,7 @@ impl Note {
         Ok(note)
     }
 
+    /// Save the note to the specified path.
     pub fn write_to_file(&self, path: &Path) -> std::io::Result<()> {
         let mut file = File::create(path)?;
 
@@ -291,6 +293,7 @@ impl Note {
         kv
     }
 
+    /// Get the note's content (document).
     pub fn content(&self) -> &str {
         &self.content
     }
