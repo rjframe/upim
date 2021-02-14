@@ -44,7 +44,7 @@
 #![feature(with_options)]
 
 use std::{
-    collections::HashMap,
+    collections::hash_map::{HashMap, Keys},
     fs::File,
     io::Write,
     ops::{Index, IndexMut},
@@ -282,9 +282,8 @@ impl Note {
         self.map.contains_key(key)
     }
 
-    // TODO: Return iterator
-    pub fn attribute_keys(&self) -> Vec<String> {
-        self.map.keys().cloned().collect()
+    pub fn attribute_keys(&self) -> Keys<String, String> {
+        self.map.keys()
     }
 
     // TODO: Return iterator
