@@ -263,6 +263,11 @@ impl Note {
         &self.tags
     }
 
+    /// Look up the attribute value matching the given key.
+    pub fn get_attribute(&self, key: &str) -> Option<&String> {
+        self.map.get(key)
+    }
+
     /// Add or update the specified attribute on the note.
     pub fn set_attribute(&mut self, key: &str, value: &str) {
         self.map.insert(key.into(), value.into());
@@ -489,6 +494,8 @@ mod tests {
         ";
 
         let note = Note::from_str(text).unwrap();
+        assert_eq!(note.get_attribute("Date"), Some(&String::from("None")));
+        assert_eq!(note.get_attribute("Some"), Some(&String::from("Thing")));
         assert_eq!(note["Date"], "None");
         assert_eq!(note["Some"], "Thing");
     }
