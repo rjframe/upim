@@ -303,6 +303,11 @@ impl Note {
         &self.content
     }
 
+    /// Erase the note's content.
+    pub fn clear_content(&mut self) {
+        self.content = String::new();
+    }
+
 
     fn read_metadata_line(line: &str, line_num: u32,)
     -> Result<Metadata, FileError> {
@@ -555,5 +560,24 @@ mod tests {
         let note = Note::from_str(text).unwrap();
 
         assert_eq!(note.tags(), ["@tag1".to_string(), "@tag2".to_string()]);
+    }
+
+    #[test]
+    fn note_clear_content_data() {
+        let text = "\
+        @some-tag @other-tag\n\
+        @another-tag\n\
+        [Date: None]\n\
+        [Some: Thing]\n\
+        \n\
+        Some content goes here.\n\
+        \n\
+        And more stuff.\n\
+        ";
+
+        let mut note = Note::from_str(text).unwrap();
+        assert!(! note.content().is_empty());
+        note.clear_content();
+        assert!(note.content().is_empty());
     }
 }
