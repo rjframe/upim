@@ -1,0 +1,4 @@
+mod contact;
+
+fn main() {
+}
