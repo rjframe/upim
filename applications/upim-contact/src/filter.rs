@@ -1,8 +1,128 @@
-//! Contact filter
+//! # Contact Filters
 //!
-//! Contact filters are almost SQL "SELECT FROM" queries.
+//! Contact filters are SQL SELECT-like queries that retrieve and display
+//! information about the contacts that pass the filter.
 //!
-//! (TODO: Finish filter description, add EBNF)
+//!
+//! # Query Language
+//!
+//! ## Examples
+//!
+//! The below examples show how the command-line application is called. The
+//! string passed to the `--filter` option is parsed.
+//!
+//! ```shell
+//! # Get the name of Favorite Person's employer
+//! upim-contact search --filter \
+//!     "'Employer:Name' WHERE Name = 'Favorite Person'"
+//!
+//! # Get the name and phone number of everyone that works for My Company.
+//! upim-contact search --filter \
+//!     "'Name,Phone' WHERE 'Employer:Name' = 'My Company'"
+//!
+//! # Ditto the above, plus get spouse names and numbers.
+//! upim-contact search --filter "'Name,Phone,s.Name,s.Phone' WHERE \
+//!     'Employer:Name' = 'My Company' AND s = REF(Spouse)"
+//! ```
+//!
+//!
+//! ## Functions
+//!
+//! <table>
+//! <tr><th>Name</th><th>Description></th></tr>
+//! <tr>
+//! <td><code>REF(field name)</code></td>
+//! <td>
+//!     Reference the specified field as a subcontact. Other portions of the
+//!     query may refer to that subcontact. For example: with
+//!     <code>s = REF(Spouse)</code> a contact with the name listed in the
+//!     Spouse field is linked with the name <code>s</code> and its fields can
+//!     be used like any other field: <code>s.Phone</code>.
+//! </td></tr>
+//! <tr><td><code>SPLIT(field&nbsp;name,&nbsp;separator)</code></td>
+//! <td>
+//!     Split the given field via <code>separator</code> into multiple fields.
+//!     The rest of the query will operate on each created field individually
+//!     (this effectively works like "for each subfield in fields").<br /><br />
+//!     For example: <code>c WHERE c = SPLIT(Children, ',')</code> will print
+//!     the name of each child listed in the Children field. Alternatively,
+//!     <code>c.Name,c.Phone WHERE c = SPLIT(REF(Children, ','))</code> will
+//!     treat each child's name as a reference to a new contact, then look up
+//!     the Name and Phone fields from that contact.
+//! </td></tr>
+//! <tr><td><Code>REGEX(field name, regex)</code></td>
+//! <td>
+//!     Filter the result set to only include contacts in which the values of
+//!     the given field match the regular expression.
+//! </td></tr>
+//! </table>
+//!
+//!
+//! ## Formal Grammar
+//!
+//! All character and string literals are case-insensitive.
+//!
+//! ```ebnf
+//! Filter ::= FieldList ( 'WHERE' Condition )?
+//!
+//! Condition ::=
+//!     FieldName Op String
+//!     | FunctionClause
+//!     | '(' Condition ')'
+//!     | Condition 'AND' Condition
+//!     | Condition 'OR' Condition
+//!
+//! FunctionClause ::=
+//!     Variable '=' RefFunction
+//!     | Variable '=' SplitFunction
+//!     | RegexFunction
+//!
+//! RefFunction ::= 'REF' '(' ( FieldName | SplitFunction ) ')'
+//!
+//! SplitFunction ::= 'SPLIT' '(' FieldName ',' Char ')'
+//!
+//! RegexFunction ::= 'REGEX' '(' FieldName ',' String ')'
+//!
+//! Variable ::= ( AnyWord - [:numeric:] ) AnyWord*
+//!
+//! FieldList ::= UnquotedFieldList | QuotedFieldList
+//!
+//! UnquotedFieldList ::= UnquotedFieldName ( ',' UnquotedFieldName )*
+//!
+//! QuotedFieldList ::=
+//!     '\'' UnquotedFieldList '\''
+//!     | '"' UnquotedFieldList '"'
+//!
+//! GroupName ::= AnyWord
+//!
+//! FieldName ::= UnquotedFieldName | QuotedFieldName
+//!
+//! UnquotedFieldName ::=
+//!     ( GroupName ':' )? AnyWord
+//!     | ( Variable '.' )? AnyWord
+//!
+//! QuotedFieldName ::=
+//!     '\'' UnquotedFieldName '\''
+//!     | '"' UnquotedFieldName '"'
+//!
+//! Op ::=
+//!     '='
+//!     | '<'
+//!     | '<='
+//!     | '>'
+//!     | '>='
+//!     | 'NOT'
+//!
+//! String ::=
+//!     '\'' ( AnyText | Reserved ) '\''
+//!     | '"' ( AnyText | Reserved ) '"'
+//!
+//! AnyText ::= ( [:printable:] - ',' )* - Reserved
+//!
+//! AnyWord ::= ( AnyText - [:whitespace:] - [:punctuation:] )*
+//!
+//! Reserved ::= 'AND' | 'OR' | 'WHERE'
+//! ```
 
 use std::str::FromStr;
 
