@@ -1,4 +1,5 @@
 use std::{
+    collections::hash_map::Keys as Groups,
     path::Path,
     str::FromStr as _,
 };
@@ -133,6 +134,11 @@ impl Contact {
         self.info.get(&group.to_lowercase())
             .and_then(|g| g.get_attribute(name))
     }
+
+    /// Return an iterator of the groups defined by the Contact.
+    pub fn groups<'a>(&'a self) -> Groups<'a, String, Vec<Note>> {
+        self.info.keys()
+    }
 }
 
 #[cfg(test)]
@@ -224,5 +230,22 @@ mod tests {
             contact.get_field_from("employer", "Address").unwrap(),
             "123 Somewhere"
         );
+    }
+
+    #[test]
+    fn group_list() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        \n\
+        @employer\n\
+        [Name: Some Company]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+        let groups: Vec<&String> = contact.groups().collect();
+
+        assert!(groups.contains(&&String::from("default")));
+        assert!(groups.contains(&&String::from("employer")));
+        assert_eq!(groups.len(), 2);
     }
 }
