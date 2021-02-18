@@ -9,7 +9,7 @@
 //! ## Examples
 //!
 //! The below examples show how the command-line application is called. The
-//! string passed to the `--filter` option is parsed.
+//! string passed to the `--filter` option is parsed by [Filter::from_str].
 //!
 //! ```shell
 //! # Get the name of Favorite Person's employer
@@ -66,7 +66,7 @@
 //! Filter ::= FieldList ( 'WHERE' Condition )?
 //!
 //! Condition ::=
-//!     FieldName Op String
+//!     FieldName Op StringLiteral
 //!     | FunctionClause
 //!     | '(' Condition ')'
 //!     | Condition 'AND' Condition
@@ -81,7 +81,7 @@
 //!
 //! SplitFunction ::= 'SPLIT' '(' FieldName ',' Char ')'
 //!
-//! RegexFunction ::= 'REGEX' '(' FieldName ',' String ')'
+//! RegexFunction ::= 'REGEX' '(' FieldName ',' StringLiteral ')'
 //!
 //! Variable ::= ( AnyWord - [:numeric:] ) AnyWord*
 //!
@@ -113,9 +113,9 @@
 //!     | '>='
 //!     | 'NOT'
 //!
-//! String ::=
-//!     '\'' ( AnyText | Reserved ) '\''
-//!     | '"' ( AnyText | Reserved ) '"'
+//! StringLiteral ::=
+//!     '\'' [:printable:] '\''
+//!     | '"' [:printable:] '"'
 //!
 //! AnyText ::= ( [:printable:] - ',' )* - Reserved
 //!
@@ -123,6 +123,9 @@
 //!
 //! Reserved ::= 'AND' | 'OR' | 'WHERE'
 //! ```
+
+// TODO: Current implementation requires a space between elements of a query
+// ("Field=value" should be valid, but isn't). Need to parse it properly.
 
 use std::str::FromStr;
 
