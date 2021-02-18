@@ -244,9 +244,7 @@ impl FromStr for Filter {
             f.condition = Condition::All;
             return Ok(f);
         }
-
         s = s[idx..s.len()].trim_start();
-        if s.is_empty() { return Ok(f); }
 
         if s.len() < 6 || s[0..5].to_ascii_uppercase() != "WHERE" {
             return Err(anyhow!("Expected WHERE clause: found: {}", s));
