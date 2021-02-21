@@ -206,17 +206,44 @@ impl FromStr for Condition {
     fn from_str(s: &str) -> anyhow::Result<Self> {
         let mut s = s.trim_start();
 
-        let (len, field) = read_field(s)?;
-        s = &s[len..s.len()].trim_start();
+        let (len, cond1) = if s.starts_with('(') {
+            match s.find(')') {
+                Some(i) => (i, Some(Condition::from_str(&s[1..i])?)),
+                None => return Err(
+                    anyhow!("Missing closing parenthesis in condition"))
+            }
+        } else {
+            (0, None)
+        };
 
-        let (len, op) = read_op(s)?;
-        s = &s[len..s.len()].trim_start();
+        if len == s.len() - 1 {
+            return cond1.ok_or(anyhow!("Invalid condition string: {}", s));
+        }
 
-        // TODO: If the remaining string is a function...
+        let ops = [" AND ", " OR "];
 
-        Ok(Self::Filter(field, op, s.into()))
+        if let Some((i, op)) = rfind_any(&s.to_ascii_uppercase(), &ops) {
+            let lhs = &s[0..i];
+            let rhs = &s[i + op.len() .. s.len()];
 
-        // TODO: If the remaining string is AND/OR...
+            let cond1 = Condition::from_str(lhs)?;
+            let cond2 = Condition::from_str(rhs)?;
+
+            match op {
+                " AND " => Ok(Condition::And(Box::new((cond1, cond2)))),
+                " OR " => Ok(Condition::Or(Box::new((cond1, cond2)))),
+                _ => panic!("Unknown operator"),
+            }
+        } else {
+            let (len, field) = read_field(s)?;
+            s = &s[len..s.len()].trim_start();
+
+            let (len, op) = read_op(s)?;
+            s = &s[len..s.len()].trim_start();
+
+            // TODO: Ensure the remainder of the string is quoted.
+            Ok(Condition::Filter(field, op, s.into()))
+        }
     }
 }
 
@@ -256,6 +283,25 @@ impl FromStr for Filter {
 
         Ok(f)
     }
+}
+
+/// Return the index of the rightmost of any element in `patterns` in the given
+/// string.
+fn rfind_any<'a>(s: &str, patterns: &'a [&'a str]) -> Option<(usize, &'a str)> {
+    let mut s = s;
+
+    while ! s.is_empty() {
+        for p in patterns.iter() {
+            if s.ends_with(p) {
+                return Some((s.len() - p.len(), p));
+            }
+        }
+
+        // TODO: This is invalid on multi-byte characters.
+        s = &s[0..s.len()-1];
+    }
+
+    None
 }
 
 /// Read a single field from the input string.
@@ -352,6 +398,18 @@ fn read_op(s: &str) -> anyhow::Result<(usize, FilterOp)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn find_any_patterns() {
+        let text = "apple banana orange";
+
+        assert_eq!(rfind_any(text, &["a"]), Some((15, "a")));
+        assert_eq!(rfind_any(text, &["an"]), Some((15, "an")));
+        assert_eq!(rfind_any(text, &["ge"]), Some((17, "ge")));
+        assert_eq!(rfind_any(text, &["an", "ge"]), Some((17, "ge")));
+        assert_eq!(rfind_any(text, &["zebra"]), None);
+    }
+
 
     #[test]
     fn read_single_field_no_quotes() {
@@ -460,7 +518,28 @@ mod tests {
 
     #[test]
     fn parse_filter_and_filter() {
-        let text = "'s.Name,s.Phone' WHERE Name = 'Person' AND s = REF(Spouse)";
+        let text = "Name = 'Person' AND Phone > 1";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::And(Box::new((
+                Condition::Filter(
+                    "Name".into(),
+                    FilterOp::EqualTo,
+                    "'Person'".into()
+                ),
+                Condition::Filter(
+                    "Phone".into(),
+                    FilterOp::GreaterThan,
+                    "1".into()
+                ),
+            )))
+        );
+    }
+
+    #[test]
+    fn parse_filter_and_function() {
+        let text = "Name = 'Person' AND s = REF(Spouse)";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
@@ -477,7 +556,7 @@ mod tests {
 
     #[test]
     fn parse_filter_or_filter() {
-        panic!();
+        panic!("Not implemented");
     }
 
     #[test]
