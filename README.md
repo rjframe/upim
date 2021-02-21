@@ -10,7 +10,7 @@ lot of work still to do before most people will find any use from it.
 The official repository for uPIM is on SourceHut at
 [https://git.sr.ht/~rjframe/upim](https://git.sr.ht/~rjframe/upim), with a
 mirror at Github on
-[https://github.com/rjframe/upim](https://github.com/rjframe/upim). Pull
+[https://github.com/rjframe/upim](https://github.com/rjframe/upim). Patches/pull
 requests from both are accepted; all other activity takes place at sr.ht.
 
 * Issues: [https://todo.sr.ht/~rjframe/upim](https://todo.sr.ht/~rjframe/upim/)
@@ -145,18 +145,24 @@ Mix the water and salt together. Let dry.
 Storing contact information:
 
 ```
-@family
+@family @last-update:2000-01-01
 [Name: Favorite Person]
 [Spouse: Other Person]
 [Children: A Person, B Person, C Person]
+
+[Address: 123 Somewhere]
 [Phone: 123-456]
+
+@employer
+[Name: Some Company]
+[Website: www.example.com]
 
 And there's plenty of room for whatever prose you wish to remember.
 ```
 
 Using notes for something like contacts provides more flexibility than vCard
 (add any arbitrary data you like), while being easily converted to and from
-vCard via standard attributes.
+vCard via standard (user-configurable) attributes.
 
 
 ### Applications
@@ -206,9 +212,9 @@ _upim-conv_ | Conversions between Notes and other standard file formats
 
 ## Contributing
 
-Pull requests are welcome. For major features or breaking changes, please open
-an issue or start a discussion first so we can discuss what you would like to
-do.
+Patches and pull requests are welcome. For major features or breaking changes,
+please open an issue or start a discussion first so we can discuss what you
+would like to do.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for pointers on getting set up. If you'd
 like guidance on anything feel free to ask in a discussion or ticket, or submit
@@ -218,8 +224,8 @@ Some specific areas of concern I could use help with are:
 
 * Ensuring upim-edit supports a variety of text editors
 * Decisions around document/configuration file management on macOS
-* Testing on Windows
-* Maintainer for the Windows platform
+* Testing on Windows, macOS
+* Maintainer for the Windows platform, maybe macOS
 
 
 ## Contact
