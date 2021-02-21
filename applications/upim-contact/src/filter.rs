@@ -129,7 +129,7 @@
 
 use std::str::FromStr;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context as _};
 
 
 /// Supported operators on filters.
@@ -167,19 +167,114 @@ impl FromStr for FilterOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Function {
     /// Look up the value of the included field as a subcontact for the query.
-    Ref(String),
+    // variable, field
+    Ref(String, String),
     /// Split the value of the included field by the specified character. Treat
     /// each split as an individual value.
-    Split(String, char),
+    // variable, field, separator
+    Split(String, String, char),
     /// Match the given field's value against the provided regular expression.
     Regex(String, String),
 }
 
-impl FromStr for Function {
-    type Err = anyhow::Error;
+#[derive(Debug)]
+enum FunctionParseError {
+    InvalidArguments(String),
+    MissingClosingParenthesis,
+    NoVariableAssignment(String),
+    InvalidOperator(FilterOp), //
+    UnknownFunction(String), //
+}
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
-        panic!();
+// TODO: Real implementation
+impl std::fmt::Display for FunctionParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for FunctionParseError {}
+
+impl FromStr for Function {
+    type Err = FunctionParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s.len() > 6 && s[0..=6].starts_with("REGEX(") {
+            match s[7..s.len()].find(')') {
+                Some(i) => {
+                    if let Some((val, expr)) = s[7..i].split_once(',') {
+                        return Ok(Function::Regex(val.into(), expr.into()));
+                    } else {
+                        return Err(
+                            FunctionParseError::InvalidArguments(s.into())
+                        );
+                    }
+                },
+                None => {
+                    return Err(FunctionParseError::MissingClosingParenthesis);
+                }
+            }
+        }
+
+        let mut s = s;
+
+        let (len, var) = read_variable(s)
+            .map_err(|e| FunctionParseError::NoVariableAssignment(
+                e.to_string())
+            )?;
+        s = &s[len..s.len()].trim_start();
+
+        let (len, op) = read_op(s)
+            .map_err(|e| FunctionParseError::NoVariableAssignment(
+                e.to_string())
+            )?;
+        if op != FilterOp::EqualTo {
+            return Err(FunctionParseError::InvalidOperator(op));
+        }
+        s = &s[len..s.len()].trim_start();
+
+        if s.len() >= 6 {
+            let end_idx = s[7..s.len()].find(')')
+                .and_then(|v| Some(v + 7));
+
+            if s[0..=3].to_ascii_uppercase() == "REF(" {
+                let end_idx = end_idx
+                    .ok_or(FunctionParseError::MissingClosingParenthesis)?;
+                // field name or split function
+                panic!("TODO: implement REF parsing");
+            } else if s[0..=5].to_ascii_uppercase() == "SPLIT(" {
+                let end_idx = end_idx
+                    .ok_or(FunctionParseError::MissingClosingParenthesis)?;
+
+                if let Some((field, sp)) = s[6..end_idx].split_once(',') {
+                    // TODO: Validate field name.
+
+                    let split_str = sp.chars()
+                        // TODO: This allows inputting a separator like: '  , '
+                        .skip_while(|c| c.is_whitespace())
+                        .collect::<Vec<char>>();
+
+                    if split_str.len() != 3 && split_str[0] != split_str[1]
+                        && (split_str[0] == '\'' || split_str[0] == '"')
+                    {
+                        return Err(FunctionParseError::InvalidArguments(
+                            "Missing or invalid opening quotation for splitter"
+                                .into()
+                        ));
+                    }
+
+                    Ok(Function::Split(var, field.into(), split_str[1]))
+                } else {
+                    Err(FunctionParseError::InvalidArguments(
+                        "Invalid arguments to SPLIT function".into()
+                    ))
+                }
+            } else {
+                Err(FunctionParseError::UnknownFunction(s.into()))
+            }
+        } else {
+            Err(FunctionParseError::UnknownFunction(s.into()))
+        }
     }
 }
 
@@ -188,8 +283,7 @@ enum Condition {
     All, // Unfiltered.
     // Field, op, value
     Filter(String, FilterOp, String),
-    // Identifier = Function; e.g., "s = REF(Spouse)"
-    Function(String, Function),
+    Function(Function),
     // Logical and with the contained conditions.
     And(Box<(Condition, Condition)>),
     // Logical or with the contained conditions.
@@ -235,14 +329,32 @@ impl FromStr for Condition {
                 _ => panic!("Unknown operator"),
             }
         } else {
-            let (len, field) = read_field(s)?;
-            s = &s[len..s.len()].trim_start();
+            match Function::from_str(s) {
+                Ok(f) => {
+                    Ok(Condition::Function(f))
+                },
+                Err(FunctionParseError::UnknownFunction(_))
+                    | Err(FunctionParseError::InvalidOperator(_)) => {
+                    // If it doesn't look like an attempt to call a function, we
+                    // assume its matching a field.
+                    // TODO: Building a proper syntax tree can let us do better
+                    // and our code would probably look a lot nicer too.
 
-            let (len, op) = read_op(s)?;
-            s = &s[len..s.len()].trim_start();
+                    let (len, field) = read_field(s)?;
+                    s = &s[len..s.len()].trim_start();
 
-            // TODO: Ensure the remainder of the string is quoted.
-            Ok(Condition::Filter(field, op, s.into()))
+                    let (len, op) = read_op(s)?;
+                    s = &s[len..s.len()].trim_start();
+
+                    // TODO: Ensure the remainder of the string is quoted.
+                    Ok(Condition::Filter(field, op, s.into()))
+                },
+                Err(e) => {
+                    Err(anyhow::Error::from(e))
+                }
+            }
+
+
         }
     }
 }
@@ -285,6 +397,9 @@ impl FromStr for Filter {
     }
 }
 
+// TODO: Consistent signatures for find_any and rfind_any: char or &str
+// patterns.
+
 /// Return the index of the rightmost of any element in `patterns` in the given
 /// string.
 fn rfind_any<'a>(s: &str, patterns: &'a [&'a str]) -> Option<(usize, &'a str)> {
@@ -302,6 +417,12 @@ fn rfind_any<'a>(s: &str, patterns: &'a [&'a str]) -> Option<(usize, &'a str)> {
     }
 
     None
+}
+
+fn find_any(s: &str, patterns: &[char]) -> Option<(usize, char)> {
+    s.chars()
+        .enumerate()
+        .find(|c| patterns.contains(&c.1))
 }
 
 /// Read a single field from the input string.
@@ -379,6 +500,14 @@ fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
         },
         None => Err(anyhow!("Expected closing quote in field list"))
     }
+}
+
+fn read_variable(s: &str) -> anyhow::Result<(usize, String)> {
+    let (idx, _) = find_any(s, &[' ', '='])
+        .ok_or("Expected variable assignment")
+        .map_err(anyhow::Error::msg).with_context(|| s.to_owned())?;
+
+    Ok((idx + 1, s[0..idx].trim().into()))
 }
 
 /// Read a filter operator from the input string.
@@ -506,15 +635,38 @@ mod tests {
     }
 
     #[test]
-    fn parse_condition_by_function() {
+    fn parse_condition_by_ref_function() {
         let text = "v =  REF(SomeField)";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
-            Condition::Function("v".into(), Function::Ref("SomeField".into()))
+            Condition::Function(
+                Function::Ref("v".into(), "SomeField".into())
+            )
         );
     }
-    // TODO: Test all supported functions.
+
+    #[test]
+    fn parse_condition_by_split_field_function() {
+        let text = "v = SPLIT(Children, ',')";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Function(
+                Function::Split("v".into(), "Children".into(), ',')
+            )
+        )
+    }
+
+    #[test]
+    fn parse_condition_by_split_ref_function() {
+        panic!("Not implemented");
+    }
+
+    #[test]
+    fn parse_condition_by_regex_function() {
+        panic!("Not implemented");
+    }
 
     #[test]
     fn parse_filter_and_filter() {
@@ -549,15 +701,21 @@ mod tests {
                     FilterOp::EqualTo,
                     "'Person'".into()
                 ),
-                Condition::Function("s".into(), Function::Ref("Spouse".into()))
+                Condition::Function(Function::Ref("s".into(), "Spouse".into()))
             )))
         );
     }
 
+    /* TODO: Tests:
+     * (cond) AND/OR (cond)
+     * (cond AND/OR cond)
+     * (cond AND/OR (cond AND/OR cond))
+     * ((cond AND/OR cond) AND/OR cond)
     #[test]
     fn parse_filter_or_filter() {
         panic!("Not implemented");
     }
+    */
 
     #[test]
     fn parse_filter_by_field_value() {
