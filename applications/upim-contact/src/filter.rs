@@ -132,6 +132,13 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context as _};
 
 
+/// Generic "either one or the other" type.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Either<T, U> {
+    Left(T),
+    Right(U),
+}
+
 /// Supported operators on filters.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum FilterOp {
@@ -167,8 +174,8 @@ impl FromStr for FilterOp {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Function {
     /// Look up the value of the included field as a subcontact for the query.
-    // variable, field
-    Ref(String, String),
+    // variable, field|split
+    Ref(String, Either<String, Box<Function>>),
     /// Split the value of the included field by the specified character. Treat
     /// each split as an individual value.
     // variable, field, separator
@@ -240,41 +247,54 @@ impl FromStr for Function {
             if s[0..=3].to_ascii_uppercase() == "REF(" {
                 let end_idx = end_idx
                     .ok_or(FunctionParseError::MissingClosingParenthesis)?;
-                // field name or split function
-                panic!("TODO: implement REF parsing");
+
+                if end_idx > 10 && &s[4..=9] == "SPLIT(" {
+                    // end_idx is the end of our inner function.
+                    let func = parse_split_function(&s[10..end_idx], &"")?;
+                    Ok(Function::Ref(var, Either::Right(Box::new(func))))
+                } else {
+                    // TODO: Validate field name.
+                    let field = &s[4..end_idx];
+                    Ok(Function::Ref(var, Either::Left(field.into())))
+                }
             } else if s[0..=5].to_ascii_uppercase() == "SPLIT(" {
                 let end_idx = end_idx
                     .ok_or(FunctionParseError::MissingClosingParenthesis)?;
 
-                if let Some((field, sp)) = s[6..end_idx].split_once(',') {
-                    // TODO: Validate field name.
-
-                    let split_str = sp.chars()
-                        // TODO: This allows inputting a separator like: '  , '
-                        .skip_while(|c| c.is_whitespace())
-                        .collect::<Vec<char>>();
-
-                    if split_str.len() != 3 && split_str[0] != split_str[1]
-                        && (split_str[0] == '\'' || split_str[0] == '"')
-                    {
-                        return Err(FunctionParseError::InvalidArguments(
-                            "Missing or invalid opening quotation for splitter"
-                                .into()
-                        ));
-                    }
-
-                    Ok(Function::Split(var, field.into(), split_str[1]))
-                } else {
-                    Err(FunctionParseError::InvalidArguments(
-                        "Invalid arguments to SPLIT function".into()
-                    ))
-                }
+                parse_split_function(&s[6..end_idx], &var)
             } else {
                 Err(FunctionParseError::UnknownFunction(s.into()))
             }
         } else {
             Err(FunctionParseError::UnknownFunction(s.into()))
         }
+    }
+}
+
+fn parse_split_function(s: &str, var: &str)
+-> std::result::Result<Function, FunctionParseError> {
+    if let Some((field, sp)) = s.split_once(',') {
+        // TODO: Validate field name.
+
+        let split_str = sp.chars()
+            // TODO: This allows inputting a separator like: '  , '
+            .skip_while(|c| c.is_whitespace())
+            .collect::<Vec<char>>();
+
+        if split_str.len() != 3 && split_str[0] != split_str[1]
+            && (split_str[0] == '\'' || split_str[0] == '"')
+        {
+            return Err(FunctionParseError::InvalidArguments(
+                "Missing or invalid opening quotation for splitter"
+                .into()
+            ));
+        }
+
+        Ok(Function::Split(var.to_owned(), field.into(), split_str[1]))
+    } else {
+        Err(FunctionParseError::InvalidArguments(
+            "Invalid arguments to SPLIT function".into()
+        ))
     }
 }
 
@@ -435,6 +455,8 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
             Some('"') => (1, '"'),
+            // TODO: Only valid in a REF function (and the others are invalid).
+            Some('(') => (1, ')'),
             Some(_) => (0, ' '),
             None => return Err(anyhow!("Expected a field name"))
         };
@@ -641,7 +663,7 @@ mod tests {
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
             Condition::Function(
-                Function::Ref("v".into(), "SomeField".into())
+                Function::Ref("v".into(), Either::Left("SomeField".into()))
             )
         );
     }
@@ -660,7 +682,23 @@ mod tests {
 
     #[test]
     fn parse_condition_by_split_ref_function() {
-        panic!("Not implemented");
+        let text = "v = REF(SPLIT(Children, ','))";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Function(
+                Function::Ref(
+                    "v".into(),
+                    Either::Right(Box::new(
+                        Function::Split(
+                            "".into(),
+                            "Children".into(),
+                            ','
+                        )
+                    ))
+                )
+            )
+        );
     }
 
     #[test]
@@ -701,7 +739,11 @@ mod tests {
                     FilterOp::EqualTo,
                     "'Person'".into()
                 ),
-                Condition::Function(Function::Ref("s".into(), "Spouse".into()))
+                Condition::Function(
+                    Function::Ref(
+                        "s".into(),
+                        Either::Left("Spouse".into())
+                    ))
             )))
         );
     }
