@@ -170,6 +170,19 @@ impl FromStr for FilterOp {
     }
 }
 
+impl std::fmt::Display for FilterOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Self::EqualTo => "=",
+            Self::LessThan => "<",
+            Self::LessEq => "<=",
+            Self::GreaterThan => ">",
+            Self::GreaterEq => ">=",
+            Self::Not => "NOT",
+        })
+    }
+}
+
 /// Supported functions in queries.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Function {
@@ -184,19 +197,29 @@ enum Function {
     Regex(String, String),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum FunctionParseError {
     InvalidArguments(String),
     MissingClosingParenthesis,
     NoVariableAssignment(String),
-    InvalidOperator(FilterOp), //
-    UnknownFunction(String), //
+    InvalidOperator(FilterOp),
+    UnknownFunction(String),
 }
 
-// TODO: Real implementation
 impl std::fmt::Display for FunctionParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            FunctionParseError::InvalidArguments(s) =>
+                write!(f, "Invalid argument: {}", s),
+            FunctionParseError::MissingClosingParenthesis =>
+                write!(f, "Missing closing parenthesis"),
+            FunctionParseError::NoVariableAssignment(s) =>
+                write!(f, "Variable assignment from function expected; received: {}", s),
+            FunctionParseError::InvalidOperator(op) =>
+                write!(f, "Invalid operator: {}", op),
+            FunctionParseError::UnknownFunction(s) =>
+                write!(f, "Unknown function: {}", s),
+        }
     }
 }
 
