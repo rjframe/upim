@@ -268,7 +268,7 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
             Some('"') => (1, '"'),
-            Some(c) => (0, ' '),
+            Some(_) => (0, ' '),
             None => return Err(anyhow!("Expected a field name"))
         };
 
@@ -306,7 +306,7 @@ fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
             Some('"') => (1, '"'),
-            Some(c) => (0, ' '),
+            Some(_) => (0, ' '),
             None => return Ok((0, vec![])),
         };
 
