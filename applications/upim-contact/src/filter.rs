@@ -450,26 +450,6 @@ impl FromStr for Filter {
     }
 }
 
-/// Return the (byte) index of the rightmost of any element in `patterns` in the
-/// given string.
-fn rfind_any_str<'a>(s: &str, patterns: &'a [&'a str])
--> Option<(usize, &'a str)> {
-    let mut s = s;
-
-    while ! s.is_empty() {
-        for p in patterns.iter() {
-            if s.ends_with(p) {
-                return Some((s.len() - p.len(), p));
-            }
-        }
-
-        // TODO: This is invalid on multi-byte characters.
-        s = &s[0..s.len()-1];
-    }
-
-    None
-}
-
 /// Return the (byte) index of the leftmost of any element in `patterns` in the
 /// given string.
 fn find_any_str<'a>(s: &str, patterns: &'a [&'a str])
@@ -658,17 +638,6 @@ fn read_op(s: &str) -> anyhow::Result<(usize, FilterOp)> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn rfind_any_patterns() {
-        let text = "apple banana orange";
-
-        assert_eq!(rfind_any_str(text, &["a"]), Some((15, "a")));
-        assert_eq!(rfind_any_str(text, &["an"]), Some((15, "an")));
-        assert_eq!(rfind_any_str(text, &["ge"]), Some((17, "ge")));
-        assert_eq!(rfind_any_str(text, &["an", "ge"]), Some((17, "ge")));
-        assert_eq!(rfind_any_str(text, &["zebra"]), None);
-    }
 
     fn find_any_str_pattern() {
         let text = "apple banana orange";
