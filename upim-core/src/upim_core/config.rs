@@ -17,8 +17,6 @@
 //! The configuration values can be modified via the [Config::set] method; `set`
 //! also provides a convenient API for setting default values prior to reading a
 //! configuration file.
-//!
-//! Writing to INI files is not supported.
 
 use std::{
     collections::HashMap,
@@ -33,7 +31,6 @@ use super::{
 };
 
 
-// TODO: Write to file.
 // TODO: We should probably have a separate directory setup for macOS.
 
 /// Read the standard uPIM configuration.
@@ -196,6 +193,32 @@ impl Config {
         }
 
         Ok(Self { values: map })
+    }
+
+    /// Write this configuration to the given file. If the file exists, it is
+    /// replaced with the contents of this configuration.
+    pub fn write_to_file(&self, path: &Path) -> Result<(), FileError> {
+        use std::{
+            io::Write as _,
+            fs::File,
+        };
+
+        let mut file = File::create(path)?;
+
+        for group in self.groups() {
+            writeln!(file, "[{}]", group)?;
+
+            for var in self.variables_in_group(&group) {
+                writeln!(
+                    file,
+                    "{} = {}",
+                    var,
+                    self[(group.as_str(), var.as_str())]
+                )?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Merge two [Config]s, consuming both of the originals.
@@ -427,6 +450,35 @@ mod tests {
         assert_eq!(conf[("DEFAULT", "var1")], "val1");
         assert_eq!(conf[("Group A", "var2")], "value two");
         assert_eq!(conf[("Group A", "var 3")], "value = four");
+    }
+
+    #[test]
+    fn write_to_file() {
+        use std::{
+            fs::remove_file,
+            env,
+        };
+
+        let mut path = env::temp_dir();
+        path.push("writing_test_config_file");
+        path.set_extension("txt");
+
+        let _ = remove_file(&path);
+
+        let conf = Config::default()
+            .set_default("var1", "value")
+            .set("Some Group", "my variable", "my value");
+
+        conf.write_to_file(&path).unwrap();
+
+        let read_conf = Config::read_from_file(&path).unwrap();
+        assert_eq!(read_conf.get_default("var1"), Some(&"value".to_string()));
+        assert_eq!(
+            read_conf.get("Some Group", "my variable"),
+            Some(&"my value".to_string())
+        );
+
+        let _ = remove_file(&path);
     }
 
     #[test]
