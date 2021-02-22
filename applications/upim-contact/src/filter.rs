@@ -516,6 +516,32 @@ fn field_name_is_valid(field: &str) -> bool {
     find_any_str(&field.to_ascii_uppercase(), &disallowed).is_none()
 }
 
+/// Get the text within matching parenthesis
+///
+/// Returns the text (excluding the parenthesis) and the number of characters
+/// (not bytes) read.
+fn get_inner_expression<'a>(s: &'a str) -> anyhow::Result<(usize, &'a str)> {
+    let mut level = 0;
+    let mut i: isize = -1;
+    let mut ch = s.chars();
+
+    while let Some(c) = ch.next() {
+        i += 1;
+        match c {
+            '(' => level += 1,
+            ')' => level -= 1,
+            _ => {}
+        };
+        if level == 0 { break; }
+    }
+
+    if level == 0 {
+        Ok(((i+1) as usize, &s[1..=(i-1) as usize]))
+    } else {
+        Err(anyhow!("Not a parenthesized expression"))
+    }
+}
+
 /// Read a single field from the input string.
 ///
 /// # Returns
@@ -707,7 +733,6 @@ mod tests {
     #[test]
     fn error_on_read_of_invalid_field() {
         let text = "'Field, and other' more text";
-        println!("* {:?}", read_fields(text));
         assert!(read_fields(text).is_err());
     }
 
@@ -864,11 +889,33 @@ mod tests {
      * (cond AND/OR cond)
      * (cond AND/OR (cond AND/OR cond))
      * ((cond AND/OR cond) AND/OR cond)
+     */
+
     #[test]
-    fn parse_filter_or_filter() {
-        panic!("Not implemented");
+    fn get_inner_expression_inner_left() {
+        let text = "((a) and b)";
+
+        let (i, s) = get_inner_expression(text).unwrap();
+        assert_eq!(i, text.len());
+        assert_eq!(s, "(a) and b");
+
+        let (i, s) = get_inner_expression(&text[1..text.len()]).unwrap();
+        assert_eq!(i, 3);
+        assert_eq!(s, "a");
     }
-    */
+
+    #[test]
+    fn get_inner_expression_inner_right() {
+        let text = "(a and (b))";
+
+        let (i, s) = get_inner_expression(text).unwrap();
+        assert_eq!(i, text.len());
+        assert_eq!(s, "a and (b)");
+
+        let (i, s) = get_inner_expression(&text[7..text.len()]).unwrap();
+        assert_eq!(i, 3);
+        assert_eq!(s, "b");
+    }
 
     #[test]
     fn parse_filter_by_field_value() {
