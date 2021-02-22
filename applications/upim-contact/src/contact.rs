@@ -136,7 +136,7 @@ impl Contact {
     }
 
     /// Return an iterator of the groups defined by the Contact.
-    pub fn groups<'a>(&'a self) -> Groups<'a, String, Vec<Note>> {
+    pub fn groups(&self) -> Groups<String, Vec<Note>> {
         self.info.keys()
     }
 }

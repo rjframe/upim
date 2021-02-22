@@ -158,7 +158,7 @@ fn print_usage() {
 /// * arg    - an option, if necessary, to tell the editor not to fork and
 ///            detach from the shell that starts it.
 /// * path   - the path to a file to create or edit.
-fn launch_editor(editor: &str, arg: Option<&str>, path: &PathBuf)
+fn launch_editor(editor: &str, arg: Option<&str>, path: &Path)
 -> anyhow::Result<()>
 {
     use std::{

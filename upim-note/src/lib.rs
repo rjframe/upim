@@ -39,7 +39,6 @@
 //! - The document could be more than just text. The current workaround would be
 //!   a header-only document with a [Ref: <url>] to another document.
 
-#![feature(split_inclusive)]
 #![feature(str_split_once)]
 #![feature(with_options)]
 
@@ -48,7 +47,7 @@ use std::{
     fs::File,
     io::Write,
     ops::{Index, IndexMut},
-    path::{Path, PathBuf},
+    path::Path,
     str::FromStr,
 };
 
@@ -139,7 +138,7 @@ impl Note {
     }
 
     /// Validate the header of a note at the given path.
-    pub fn validate_header(path: &PathBuf) -> Result<(), FileError> {
+    pub fn validate_header(path: &Path) -> Result<(), FileError> {
         use std::io::{prelude::*, BufReader};
 
         let mut reader = BufReader::new(File::open(path)?);
@@ -311,7 +310,7 @@ impl Note {
     fn read_metadata_line(line: &str, line_num: u32,)
     -> Result<Metadata, FileError> {
         assert!(line.len() > 1);
-        assert!(line.ends_with('\n'), line.to_string());
+        assert!(line.ends_with('\n'), "{}", line.to_string());
 
         let line = &line[0..line.len()-1];
 
@@ -382,6 +381,7 @@ impl Note {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 enum Metadata {
     Tag(Vec<String>),
+    #[allow(clippy::upper_case_acronyms)]
     KV(String, String),
 }
 

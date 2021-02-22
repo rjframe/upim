@@ -10,6 +10,7 @@ use std::{
 /// Error for file IO and parse errors.
 #[derive(Debug)]
 pub enum FileError {
+    #[allow(clippy::upper_case_acronyms)]
     IO(io::Error),
     Parse { msg: String, data: String, line: u32 },
 }

@@ -67,6 +67,8 @@ All source code is licensed under the terms of the
 
 ### Application Installation
 
+Rust nightly is required.
+
 Application sources are in the `applications` directory. Run
 `cargo build --release` to build them. Default configuration files are provided
 in the `config` directory; to install them:

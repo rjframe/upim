@@ -265,7 +265,7 @@ impl FromStr for Function {
 
         if s.len() >= 6 {
             let end_idx = s[7..s.len()].find(')')
-                .and_then(|v| Some(v + 7));
+                .map(|v| v + 7);
 
             if s[0..=3].to_ascii_uppercase() == "REF(" {
                 let end_idx = end_idx
@@ -360,7 +360,8 @@ impl FromStr for Condition {
         };
 
         if len == s.len() {
-            return cond1.ok_or(anyhow!("Invalid condition string: {}", s));
+            return cond1
+                .ok_or_else(|| anyhow!("Invalid condition string: {}", s));
         }
         s = &s[len..s.len()].trim_start();
 
@@ -370,8 +371,8 @@ impl FromStr for Condition {
             let lhs = &s[0..i].trim_end();
             let rhs = &s[i + op.len() .. s.len()].trim_start();
 
-            let cond1 = if cond1.is_some() {
-                cond1.unwrap()
+            let cond1 = if let Some(c) = cond1 {
+                c
             } else {
                 Condition::from_str(lhs)?
             };
@@ -522,12 +523,11 @@ fn field_name_is_valid(field: &str) -> bool {
 ///
 /// Returns the text (excluding the parenthesis) and the number of characters
 /// (not bytes) read.
-fn get_inner_expression<'a>(s: &'a str) -> anyhow::Result<(usize, &'a str)> {
+fn get_inner_expression(s: &str) -> anyhow::Result<(usize, &str)> {
     let mut level = 0;
     let mut i: isize = -1;
-    let mut ch = s.chars();
 
-    while let Some(c) = ch.next() {
+    for c in s.chars() {
         i += 1;
         match c {
             '(' => level += 1,
