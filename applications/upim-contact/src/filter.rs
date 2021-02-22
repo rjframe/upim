@@ -229,21 +229,21 @@ impl FromStr for Function {
     type Err = FunctionParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        if s.len() > 6 && s[0..=6].starts_with("REGEX(") {
-            match s[7..s.len()].find(')') {
-                Some(i) => {
-                    if let Some((val, expr)) = s[7..i].split_once(',') {
-                        return Ok(Function::Regex(val.into(), expr.into()));
-                    } else {
-                        return Err(
-                            FunctionParseError::InvalidArguments(s.into())
-                        );
-                    }
-                },
-                None => {
-                    return Err(FunctionParseError::MissingClosingParenthesis);
-                }
-            }
+        if s.len() > 6 && &s[0..=5] == "REGEX(" {
+            let (_, args) = get_inner_expression(&s[5..s.len()])
+                .map_err(|_| FunctionParseError::InvalidArguments(
+                    s[5..s.len()].into())
+                )?;
+
+            // TODO: Ensure the regex is quoted, then store without the quotes.
+            return if let Some((val, expr)) = args.trim().split_once(',') {
+                Ok(Function::Regex(
+                    val.trim_end().into(),
+                    expr.trim_start().into()
+                ))
+            } else {
+                Err(FunctionParseError::InvalidArguments(s.into()))
+            };
         }
 
         let mut s = s;
@@ -810,7 +810,14 @@ mod tests {
 
     #[test]
     fn parse_condition_by_regex_function() {
-        panic!("Not implemented");
+        let text = "REGEX(SomeField, '.*regex.*')";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Function(
+                Function::Regex("SomeField".into(), "'.*regex.*'".into())
+            )
+        );
     }
 
     #[test]
