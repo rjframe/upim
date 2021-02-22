@@ -235,12 +235,16 @@ impl FromStr for Function {
                     s[5..s.len()].into())
                 )?;
 
-            // TODO: Ensure the regex is quoted, then store without the quotes.
             return if let Some((val, expr)) = args.trim().split_once(',') {
-                Ok(Function::Regex(
-                    val.trim_end().into(),
-                    expr.trim_start().into()
-                ))
+                let expr = expr.trim_start();
+                if ! is_quoted(expr) {
+                    Err(FunctionParseError::InvalidArguments(s.into()))
+                } else {
+                    Ok(Function::Regex(
+                        val.trim_end().into(),
+                        expr[1..expr.len()-1].into()
+                    ))
+                }
             } else {
                 Err(FunctionParseError::InvalidArguments(s.into()))
             };
@@ -400,9 +404,21 @@ impl FromStr for Condition {
                     let (len, op) = read_op(s)?;
                     s = &s[len..s.len()].trim_start();
 
-                    // TODO: Ensure the remainder of the string is quoted (it is
-                    // a string literal).
-                    Ok(Condition::Filter(field, op, s.into()))
+                    // The rest of the string should either be a string or
+                    // number. Strings must have the = operator.
+                    if is_quoted(s) && op != FilterOp::EqualTo {
+                        Err(anyhow!("Cannot make comparison with string"))
+                    } else if is_quoted(s) {
+                        Ok(Condition::Filter(
+                            field,
+                            op,
+                            s[1..s.len()-1].into()
+                        ))
+                    } else if s.parse::<f64>().is_ok() {
+                        Ok(Condition::Filter(field, op, s.into()))
+                    } else {
+                        Err(anyhow!("The string literal is not quoted"))
+                    }
                 },
                 Err(e) => {
                     Err(anyhow::Error::from(e))
@@ -497,6 +513,22 @@ fn find_any(s: &str, patterns: &[char]) -> Option<(usize, char)> {
 fn field_name_is_valid(field: &str) -> bool {
     let disallowed = [" WHERE ", " AND ", " OR ", "\"", "'"];
     find_any_str(&field.to_ascii_uppercase(), &disallowed).is_none()
+}
+
+/// Determine whether the provided string is surrounded by a single or double
+/// quotation mark.
+fn is_quoted(s: &str) -> bool {
+    let mut ch = s.chars();
+
+    match ch.next() {
+        Some(c @'"') | Some(c @ '\'') => {
+            match ch.rev().next() {
+                Some(d) => c == d,
+                None => panic!(),
+            }
+        },
+        _ => false,
+    }
 }
 
 /// Get the text within matching parenthesis
@@ -758,7 +790,7 @@ mod tests {
             Condition::Filter(
                 "Name".into(),
                 FilterOp::EqualTo,
-                "'Somebody'".into()
+                "Somebody".into()
             )
         );
     }
@@ -815,7 +847,7 @@ mod tests {
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
             Condition::Function(
-                Function::Regex("SomeField".into(), "'.*regex.*'".into())
+                Function::Regex("SomeField".into(), ".*regex.*".into())
             )
         );
     }
@@ -830,7 +862,7 @@ mod tests {
                 Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
-                    "'Person'".into()
+                    "Person".into()
                 ),
                 Condition::Filter(
                     "Phone".into(),
@@ -851,7 +883,7 @@ mod tests {
                 Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
-                    "'Person'".into()
+                    "Person".into()
                 ),
                 Condition::Filter(
                     "Phone".into(),
@@ -872,7 +904,7 @@ mod tests {
                 Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
-                    "'Person'".into()
+                    "Person".into()
                 ),
                 Condition::Function(
                     Function::Ref(
@@ -911,7 +943,7 @@ mod tests {
 
     #[test]
     fn parse_parens_prioritize_over_conjunctions() {
-        let text = "(a = b) AND (b = c)";
+        let text = "(a = 'b') AND (b = 'c')";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
@@ -924,7 +956,7 @@ mod tests {
 
     #[test]
     fn parse_parens_over_entire_condition() {
-        let text = "(a = b AND b = c)";
+        let text = "(a = 'b' AND b = 'c')";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
@@ -937,7 +969,7 @@ mod tests {
 
     #[test]
     fn parse_parens_inner_on_right() {
-        let text = "(a = b AND (b = c AND c = d))";
+        let text = "(a = 'b' AND (b = 'c' AND c = 'd'))";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
@@ -961,7 +993,7 @@ mod tests {
 
     #[test]
     fn parse_parens_inner_on_left() {
-        let text = "((a = b AND b = c) AND c = d)";
+        let text = "((a = 'b' AND b = 'c') AND c = 'd')";
 
         let cond = Condition::from_str(text).unwrap();
         assert_eq!(cond,
@@ -994,8 +1026,16 @@ mod tests {
                 condition: Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
-                    "'Somebody'".into()
+                    "Somebody".into()
                 ),
             });
+    }
+
+    #[test]
+    fn determine_string_quote_presence() {
+        assert!(is_quoted("'some text'"));
+        assert!(is_quoted("\"some text\""));
+        assert!(! is_quoted("s'ome text'"));
+        assert!(! is_quoted("'some text"));
     }
 }
