@@ -348,34 +348,39 @@ impl FromStr for Condition {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
+        // TODO: Building a proper syntax tree can let us do better and our code
+        // would probably look a lot nicer too.
         let mut s = s.trim_start();
 
         let (len, cond1) = if s.starts_with('(') {
-            match s.find(')') {
-                Some(i) => (i, Some(Condition::from_str(&s[1..i])?)),
-                None => return Err(
-                    anyhow!("Missing closing parenthesis in condition"))
-            }
+            let (len, cond_str) = get_inner_expression(s)?;
+            (len, Some(Condition::from_str(cond_str)?))
         } else {
             (0, None)
         };
 
-        if len == s.len() - 1 {
+        if len == s.len() {
             return cond1.ok_or(anyhow!("Invalid condition string: {}", s));
         }
+        s = &s[len..s.len()].trim_start();
 
-        let ops = [" AND ", " OR "];
+        let ops = ["AND ", "OR "];
 
-        if let Some((i, op)) = rfind_any_str(&s.to_ascii_uppercase(), &ops) {
-            let lhs = &s[0..i];
-            let rhs = &s[i + op.len() .. s.len()];
+        if let Some((i, op)) = find_any_str(&s.to_ascii_uppercase(), &ops) {
+            let lhs = &s[0..i].trim_end();
+            let rhs = &s[i + op.len() .. s.len()].trim_start();
 
-            let cond1 = Condition::from_str(lhs)?;
+            let cond1 = if cond1.is_some() {
+                cond1.unwrap()
+            } else {
+                Condition::from_str(lhs)?
+            };
+
             let cond2 = Condition::from_str(rhs)?;
 
             match op {
-                " AND " => Ok(Condition::And(Box::new((cond1, cond2)))),
-                " OR " => Ok(Condition::Or(Box::new((cond1, cond2)))),
+                "AND " => Ok(Condition::And(Box::new((cond1, cond2)))),
+                "OR " => Ok(Condition::Or(Box::new((cond1, cond2)))),
                 _ => panic!("Unknown operator"),
             }
         } else {
@@ -387,8 +392,6 @@ impl FromStr for Condition {
                     | Err(FunctionParseError::InvalidOperator(_)) => {
                     // If it doesn't look like an attempt to call a function, we
                     // assume its matching a field.
-                    // TODO: Building a proper syntax tree can let us do better
-                    // and our code would probably look a lot nicer too.
 
                     let (len, field) = read_field(s)?;
                     s = &s[len..s.len()].trim_start();
@@ -396,15 +399,14 @@ impl FromStr for Condition {
                     let (len, op) = read_op(s)?;
                     s = &s[len..s.len()].trim_start();
 
-                    // TODO: Ensure the remainder of the string is quoted.
+                    // TODO: Ensure the remainder of the string is quoted (it is
+                    // a string literal).
                     Ok(Condition::Filter(field, op, s.into()))
                 },
                 Err(e) => {
                     Err(anyhow::Error::from(e))
                 }
             }
-
-
         }
     }
 }
@@ -864,6 +866,27 @@ mod tests {
     }
 
     #[test]
+    fn parse_filter_or_filter() {
+        let text = "Name = 'Person' OR Phone > 1";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Or(Box::new((
+                Condition::Filter(
+                    "Name".into(),
+                    FilterOp::EqualTo,
+                    "'Person'".into()
+                ),
+                Condition::Filter(
+                    "Phone".into(),
+                    FilterOp::GreaterThan,
+                    "1".into()
+                ),
+            )))
+        );
+    }
+
+    #[test]
     fn parse_filter_and_function() {
         let text = "Name = 'Person' AND s = REF(Spouse)";
 
@@ -883,13 +906,6 @@ mod tests {
             )))
         );
     }
-
-    /* TODO: Tests:
-     * (cond) AND/OR (cond)
-     * (cond AND/OR cond)
-     * (cond AND/OR (cond AND/OR cond))
-     * ((cond AND/OR cond) AND/OR cond)
-     */
 
     #[test]
     fn get_inner_expression_inner_left() {
@@ -915,6 +931,80 @@ mod tests {
         let (i, s) = get_inner_expression(&text[7..text.len()]).unwrap();
         assert_eq!(i, 3);
         assert_eq!(s, "b");
+    }
+
+    #[test]
+    fn parse_parens_prioritize_over_conjunctions() {
+        let text = "(a = b) AND (b = c)";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::And(Box::new((
+                Condition::Filter("a".into(), FilterOp::EqualTo, "b".into()),
+                Condition::Filter("b".into(), FilterOp::EqualTo, "c".into()),
+            )))
+        );
+    }
+
+    #[test]
+    fn parse_parens_over_entire_condition() {
+        let text = "(a = b AND b = c)";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::And(Box::new((
+                Condition::Filter("a".into(), FilterOp::EqualTo, "b".into()),
+                Condition::Filter("b".into(), FilterOp::EqualTo, "c".into()),
+            )))
+        );
+    }
+
+    #[test]
+    fn parse_parens_inner_on_right() {
+        let text = "(a = b AND (b = c AND c = d))";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::And(Box::new((
+                Condition::Filter("a".into(), FilterOp::EqualTo, "b".into()),
+                Condition::And(Box::new((
+                    Condition::Filter(
+                        "b".into(),
+                        FilterOp::EqualTo,
+                        "c".into()
+                    ),
+                    Condition::Filter(
+                        "c".into(),
+                        FilterOp::EqualTo,
+                        "d".into()
+                    ),
+                )))
+            )))
+        );
+    }
+
+    #[test]
+    fn parse_parens_inner_on_left() {
+        let text = "((a = b AND b = c) AND c = d)";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::And(Box::new((
+                Condition::And(Box::new((
+                    Condition::Filter(
+                        "a".into(),
+                        FilterOp::EqualTo,
+                        "b".into()
+                    ),
+                    Condition::Filter(
+                        "b".into(),
+                        FilterOp::EqualTo,
+                        "c".into()
+                    ),
+                ))),
+                Condition::Filter("c".into(), FilterOp::EqualTo, "d".into())
+            )))
+        );
     }
 
     #[test]
