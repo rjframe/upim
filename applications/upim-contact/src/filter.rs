@@ -276,9 +276,12 @@ impl FromStr for Function {
                     let func = parse_split_function(&s[10..end_idx], &"")?;
                     Ok(Function::Ref(var, Either::Right(Box::new(func))))
                 } else {
-                    // TODO: Validate field name.
                     let field = &s[4..end_idx];
-                    Ok(Function::Ref(var, Either::Left(field.into())))
+                    if field_name_is_valid(field) {
+                        Ok(Function::Ref(var, Either::Left(field.into())))
+                    } else {
+                        Err(FunctionParseError::InvalidArguments(field.into()))
+                    }
                 }
             } else if s[0..=5].to_ascii_uppercase() == "SPLIT(" {
                 let end_idx = end_idx
@@ -297,7 +300,11 @@ impl FromStr for Function {
 fn parse_split_function(s: &str, var: &str)
 -> std::result::Result<Function, FunctionParseError> {
     if let Some((field, sp)) = s.split_once(',') {
-        // TODO: Validate field name.
+        if ! field_name_is_valid(field) {
+            return Err(FunctionParseError::InvalidArguments(
+                field.into()
+            ));
+        }
 
         let split_str = sp.chars()
             // TODO: This allows inputting a separator like: '  , '
@@ -359,7 +366,7 @@ impl FromStr for Condition {
 
         let ops = [" AND ", " OR "];
 
-        if let Some((i, op)) = rfind_any(&s.to_ascii_uppercase(), &ops) {
+        if let Some((i, op)) = rfind_any_str(&s.to_ascii_uppercase(), &ops) {
             let lhs = &s[0..i];
             let rhs = &s[i + op.len() .. s.len()];
 
@@ -440,12 +447,10 @@ impl FromStr for Filter {
     }
 }
 
-// TODO: Consistent signatures for find_any and rfind_any: char or &str
-// patterns.
-
-/// Return the index of the rightmost of any element in `patterns` in the given
-/// string.
-fn rfind_any<'a>(s: &str, patterns: &'a [&'a str]) -> Option<(usize, &'a str)> {
+/// Return the (byte) index of the rightmost of any element in `patterns` in the
+/// given string.
+fn rfind_any_str<'a>(s: &str, patterns: &'a [&'a str])
+-> Option<(usize, &'a str)> {
     let mut s = s;
 
     while ! s.is_empty() {
@@ -462,10 +467,53 @@ fn rfind_any<'a>(s: &str, patterns: &'a [&'a str]) -> Option<(usize, &'a str)> {
     None
 }
 
+/// Return the (byte) index of the leftmost of any element in `patterns` in the
+/// given string.
+fn find_any_str<'a>(s: &str, patterns: &'a [&'a str])
+-> Option<(usize, &'a str)> {
+    let mut s = s;
+    let mut i = 0;
+
+    while ! s.is_empty() {
+        for p in patterns {
+            if s.starts_with(p) {
+                return Some((i, p));
+            }
+        }
+
+        // TODO: This is invalid on multi-byte characters.
+        s = &s[1..s.len()];
+        i += 1;
+    }
+
+    None
+}
+
+/// Return the character (not byte) index of the leftmost of any element in
+/// `patterns` in the given string.
 fn find_any(s: &str, patterns: &[char]) -> Option<(usize, char)> {
     s.chars()
         .enumerate()
         .find(|c| patterns.contains(&c.1))
+}
+
+/// Check whether the specified field name is valid.
+///
+/// # Validation rules
+///
+/// Fields may not contain the following strings:
+/// - " WHERE "
+/// - " AND "
+/// - " OR "
+/// - double or single (ASCII) quotation marks
+///
+/// # Notes
+///
+/// These restrictions are due to limitations of the parser implementation and
+/// may be lifted in the future.
+fn field_name_is_valid(field: &str) -> bool {
+    let disallowed = [" WHERE ", " AND ", " OR ", "\"", "'"];
+    find_any_str(&field.to_ascii_uppercase(), &disallowed).is_none()
 }
 
 /// Read a single field from the input string.
@@ -493,10 +541,14 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
 
     match end_idx {
         Some(i) => {
+            if field_name_is_valid(&s[start_idx..i]) {
             Ok((
                 i + start_idx, // Re-add the skipped quote if necessary.
                 s[start_idx..i].into()
             ))
+            } else {
+                Err(anyhow!("Field name is not valid: {}", &s[start_idx..i]))
+            }
         },
         None => Err(anyhow!("Invalid field string: {}", s))
     }
@@ -508,12 +560,6 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
 ///
 /// Returns the number of characters read and the list of fields.
 fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
-    // TODO: Validate the field names here and with read_field. Need list of
-    // requirements.
-    // - no " WHERE "
-    // - no quote marks
-    // TODO: Refactor. This function is ugly.
-
     let (start_idx, end_idx) = {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
@@ -535,13 +581,25 @@ fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
 
     match end_idx {
         Some(i) => {
-            Ok((
+            // TODO: We could collect all errors and report each specific error,
+            // instead of the whole list.
+            let mut is_valid = true;
+            let res = (
                 i + start_idx, // Re-add the skipped quote if necessary.
                 s[start_idx..i]
                     .split(',')
+                    .inspect(|s| if ! field_name_is_valid(s)
+                        { is_valid = false; }
+                    )
                     .map(|s| s.to_string())
                     .collect()
-            ))
+            );
+
+            if is_valid {
+                Ok(res)
+            } else {
+                Err(anyhow!("Invalid field name in: {}", &s[start_idx..i]))
+            }
         },
         None => Err(anyhow!("Expected closing quote in field list"))
     }
@@ -574,16 +632,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn find_any_patterns() {
+    fn rfind_any_patterns() {
         let text = "apple banana orange";
 
-        assert_eq!(rfind_any(text, &["a"]), Some((15, "a")));
-        assert_eq!(rfind_any(text, &["an"]), Some((15, "an")));
-        assert_eq!(rfind_any(text, &["ge"]), Some((17, "ge")));
-        assert_eq!(rfind_any(text, &["an", "ge"]), Some((17, "ge")));
-        assert_eq!(rfind_any(text, &["zebra"]), None);
+        assert_eq!(rfind_any_str(text, &["a"]), Some((15, "a")));
+        assert_eq!(rfind_any_str(text, &["an"]), Some((15, "an")));
+        assert_eq!(rfind_any_str(text, &["ge"]), Some((17, "ge")));
+        assert_eq!(rfind_any_str(text, &["an", "ge"]), Some((17, "ge")));
+        assert_eq!(rfind_any_str(text, &["zebra"]), None);
     }
 
+    fn find_any_str_pattern() {
+        let text = "apple banana orange";
+
+        assert_eq!(find_any_str(text, &["a"]), Some((0, "a")));
+        assert_eq!(find_any_str(text, &["an"]), Some((7, "an")));
+        assert_eq!(find_any_str(text, &["an", "ge"]), Some((7, "an")));
+        assert_eq!(find_any_str(text, &["zebra"]), None);
+    }
+
+    fn find_any_pattern() {
+        let text = "apple banana orange";
+
+        assert_eq!(find_any(text, &['a']), Some((0, 'a')));
+        assert_eq!(find_any(text, &['p', 'r']), Some((1, 'p')));
+        assert_eq!(find_any(text, &['q']), None);
+    }
+
+    fn validate_field_name() {
+        assert!(field_name_is_valid("Some field name."));
+        assert!(! field_name_is_valid("go to where the stuff is"));
+        assert!(! field_name_is_valid("Stuff and Things"));
+        assert!(! field_name_is_valid("'some name'"));
+    }
 
     #[test]
     fn read_single_field_no_quotes() {
@@ -621,6 +702,13 @@ mod tests {
         assert_eq!(len, 17);
         assert_eq!(fields[0], "A Field");
         assert_eq!(fields[1], "B Field");
+    }
+
+    #[test]
+    fn error_on_read_of_invalid_field() {
+        let text = "'Field, and other' more text";
+        println!("* {:?}", read_fields(text));
+        assert!(read_fields(text).is_err());
     }
 
     #[test]
