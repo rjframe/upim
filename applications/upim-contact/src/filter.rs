@@ -134,14 +134,14 @@ use anyhow::{anyhow, Context as _};
 
 /// Generic "either one or the other" type.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Either<T, U> {
+pub enum Either<T, U> {
     Left(T),
     Right(U),
 }
 
 /// Supported operators on filters.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum FilterOp {
+pub enum FilterOp {
     EqualTo,
     LessThan,
     LessEq,
@@ -185,7 +185,7 @@ impl std::fmt::Display for FilterOp {
 
 /// Supported functions in queries.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Function {
+pub enum Function {
     /// Look up the value of the included field as a subcontact for the query.
     // variable, field|split
     Ref(String, Either<String, Box<Function>>),
@@ -198,7 +198,7 @@ enum Function {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum FunctionParseError {
+pub enum FunctionParseError {
     InvalidArguments(String),
     MissingClosingParenthesis,
     NoVariableAssignment(String),
@@ -333,7 +333,7 @@ fn parse_split_function(s: &str, var: &str)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Condition {
+pub enum Condition {
     All, // Unfiltered.
     // Field, op, value
     Filter(String, FilterOp, String),
