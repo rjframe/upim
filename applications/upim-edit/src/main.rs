@@ -270,7 +270,7 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
 
     if conf.get_default("collection_base").is_none() {
         if let Some(folder) = global.get_default("collection_base") {
-            conf = conf.set_default("template_folder", folder);
+            conf = conf.set_default("collection_base", folder);
         };
     }
 
