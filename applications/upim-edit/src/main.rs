@@ -31,7 +31,7 @@ use anyhow::anyhow;
 
 
 fn main() -> anyhow::Result<()> {
-    let options = Options::from_args(env::args());
+    let options = Options::new(env::args());
     let options = if let Ok(opt) = options {
         opt
     } else {
