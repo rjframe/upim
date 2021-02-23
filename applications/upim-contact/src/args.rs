@@ -20,6 +20,8 @@ pub struct Options {
     // Multiple conditions are ANDed together and stored as one.
     // If there is no cmd_or_alias, there must be a filter.
     pub filter: Option<Condition>,
+    // Maximum number of records to list
+    pub limit: Option<u32>,
 }
 
 impl Options {
@@ -67,6 +69,18 @@ impl Options {
                         None => Some(Condition::from_str(&args[1])?)
                     };
                     opts.filter = filter;
+                    args = &mut args[2..];
+                },
+                "--limit" => {
+                    if args.len() < 2 {
+                        return Err(anyhow!("Expected limit value"));
+                    }
+
+                    let limit = match args[1].parse::<u32>() {
+                        Ok(v) => if v > 0 { Some(v) } else { None },
+                        Err(_) => None,
+                    };
+                    opts.limit = limit;
                     args = &mut args[2..];
                 },
                 _ => {
@@ -160,5 +174,38 @@ mod tests {
                 )
             ))))
         );
+    }
+
+    #[test]
+    fn args_limit() {
+        let args = vec!["upim-contact", "--limit", "2"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.limit, Some(2));
+    }
+
+    #[test]
+    fn args_limit_zero_is_ignored() {
+        let args = vec!["upim-contact", "--limit", "0"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.limit, None);
+    }
+
+    #[test]
+    fn args_invalid_limit_is_ignored() {
+        let args = vec!["upim-contact", "--limit", "-4"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.limit, None);
+
+        let args = vec!["upim-contact", "--limit", "asdf"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.limit, None);
     }
 }
