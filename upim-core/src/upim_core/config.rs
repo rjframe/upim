@@ -320,7 +320,7 @@ fn get_unixy_paths() -> Option<Vec<PathBuf>> {
     let mut dirs = get_unixy_dirs().unwrap_or_default();
 
     for dir in dirs.iter_mut() {
-        dir.push("/upim.conf");
+        dir.push("upim.conf");
         if dir.exists() {
             paths.push(dir.to_path_buf());
         }
@@ -328,7 +328,7 @@ fn get_unixy_paths() -> Option<Vec<PathBuf>> {
 
     let mut pbuf = env::current_dir()
         .map_or_else(|_| PathBuf::default(), |v| v);
-    pbuf.push("/.upim.conf");
+    pbuf.push(".upim.conf");
 
     if pbuf.as_path().exists() {
         paths.push(pbuf);
@@ -349,7 +349,7 @@ fn get_windows_paths() -> Option<Vec<PathBuf>> {
     let mut dirs = get_windows_dirs().unwrap_or_default();
 
     for dir in dirs.iter_mut() {
-        dir.push("/upim.ini");
+        dir.push("upim.ini");
         if dir.exists() {
             paths.push(dir.to_path_buf());
         }
@@ -357,7 +357,7 @@ fn get_windows_paths() -> Option<Vec<PathBuf>> {
 
     let mut pbuf = env::current_dir()
         .map_or_else(|_e| PathBuf::default(), |v| v);
-    pbuf.push(r"\upim.ini");
+    pbuf.push(r"upim.ini");
 
     if pbuf.as_path().exists() {
         paths.push(pbuf);
