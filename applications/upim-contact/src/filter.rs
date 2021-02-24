@@ -124,8 +124,11 @@
 //! Reserved ::= 'AND' | 'OR' | 'WHERE'
 //! ```
 
-// TODO: Current implementation requires a space between elements of a query
-// ("Field=value" should be valid, but isn't). Need to parse it properly.
+// TODO: Need to parse conditions properly:
+// - Current implementation requires a space between elements of a query
+//   ("Field=value" should be valid, but isn't).
+// - We eat some function parsing errors in Condition::from_str() because we
+//   cannot tell the difference between a function and field filter.
 
 use std::str::FromStr;
 
@@ -394,7 +397,7 @@ impl FromStr for Condition {
                     Ok(Condition::Function(f))
                 },
                 Err(FunctionParseError::UnknownFunction(_))
-                    | Err(FunctionParseError::InvalidOperator(_)) => {
+                | Err(FunctionParseError::InvalidOperator(_)) => {
                     // If it doesn't look like an attempt to call a function, we
                     // assume its matching a field.
 
@@ -404,16 +407,25 @@ impl FromStr for Condition {
                     let (len, op) = read_op(s)?;
                     s = &s[len..s.len()].trim_start();
 
-                    // The rest of the string should either be a string or
-                    // number. Strings must have the = operator.
-                    if is_quoted(s) && op != FilterOp::EqualTo {
-                        Err(anyhow!("Cannot make comparison with string"))
-                    } else if is_quoted(s) {
-                        Ok(Condition::Filter(
-                            field,
-                            op,
-                            s[1..s.len()-1].into()
-                        ))
+                    // The rest of the string should either be EMPTY, a string,
+                    // or a number.
+                    // EMPTY or strings require the = or NOT operators.
+
+                    let s = match s {
+                        "EMPTY" => "''",
+                        _ => s,
+                    };
+
+                    if is_quoted(s) {
+                        if !(op == FilterOp::EqualTo || op == FilterOp::Not) {
+                            Err(anyhow!("Cannot make comparison with string"))
+                        } else {
+                            Ok(Condition::Filter(
+                                field,
+                                op,
+                                s[1..s.len()-1].into()
+                            ))
+                        }
                     } else if s.parse::<f64>().is_ok() {
                         Ok(Condition::Filter(field, op, s.into()))
                     } else {
@@ -791,6 +803,34 @@ mod tests {
                 "Name".into(),
                 FilterOp::EqualTo,
                 "Somebody".into()
+            )
+        );
+    }
+
+    #[test]
+    fn parse_condition_field_empty() {
+        let text = "Phone = EMPTY";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Filter(
+                "Phone".into(),
+                FilterOp::EqualTo,
+                "".into()
+            )
+        );
+    }
+
+    #[test]
+    fn parse_condition_field_not_empty() {
+        let text = "Phone NOT EMPTY";
+
+        let cond = Condition::from_str(text).unwrap();
+        assert_eq!(cond,
+            Condition::Filter(
+                "Phone".into(),
+                FilterOp::Not,
+                "".into()
             )
         );
     }
