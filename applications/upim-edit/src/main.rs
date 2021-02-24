@@ -20,14 +20,12 @@ use std::{
     fs,
 };
 
+use anyhow::anyhow;
+
 use upim_core::config::*;
 use upim_note::Note;
 
-use crate::{
-    args::*,
-};
-
-use anyhow::anyhow;
+use crate::args::*;
 
 
 fn main() -> anyhow::Result<()> {
