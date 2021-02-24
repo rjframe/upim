@@ -461,18 +461,14 @@ fn get_unixy_dirs() -> Option<Vec<PathBuf>> {
 /// locations of the configuration files.
 #[allow(dead_code)]
 fn get_windows_dirs() -> Option<Vec<PathBuf>> {
-    use std::ffi::OsString;
-
     let mut paths = vec![];
 
-    if let Some(mut path) = env::var_os("PROGRAMDATA") {
-        path.push(OsString::from(r"\uPIM"));
-        paths.push(PathBuf::from(path));
+    if let Some(path) = env::var_os("PROGRAMDATA") {
+        paths.push(PathBuf::from(path).join("uPIM"));
     }
 
-    if let Some(mut path) = env::var_os("APPDATA") {
-        path.push(OsString::from(r"\uPIM"));
-        paths.push(PathBuf::from(path));
+    if let Some(path) = env::var_os("APPDATA") {
+        paths.push(PathBuf::from(path).join("uPIM"));
     }
 
     if paths.is_empty() {
