@@ -29,6 +29,26 @@ uPIM uses a simple INI file format:
 
 ## Configuration File Locations
 
+### macOS
+
+1. `/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
+2. `/etc/upim/upim.conf`
+3. `/$HOME/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
+4. `$HOME/.config/upim/upim.conf`
+5. `(current working directory)/.upim.conf`
+
+It is recommended to use only the Library or only the non-Library directories,
+but not to mix configuration file locations between them.
+
+Values set in later files override the earlier values, so the priority is in the
+reverse order of the list above.
+
+Applications built upon uPIM may place their own configuration files within a
+`upim` configuration directory.
+
+
+### Other UNIXy
+
 Configurations are read from the following paths, in the following order:
 
 1. `/etc/upim/upim.conf`
