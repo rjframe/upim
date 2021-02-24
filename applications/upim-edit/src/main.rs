@@ -266,9 +266,12 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
 
         // If we know what argument an editor needs to tell it to run in the
         // foreground, we add it here; otherwise assume nothing is necessary.
-        if editor == "vim" {
+        if editor == "vim" || editor == "gvim" {
             conf = conf.set_default("editor_arg", "-f");
         }
+        // Editors that require nothing:
+        // - emacs (daemon mode not tested)
+        // - nvim (headless mode not tested)
     }
 
     // TODO: Once I can inspect errors, do so.
