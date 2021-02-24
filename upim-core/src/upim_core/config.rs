@@ -297,20 +297,18 @@ impl Config {
         self.set("DEFAULT", var, val)
     }
 
-    // TODO: Vec<&str>? Iterator?
     /// Get the list of groups in the configuration file.
-    pub fn groups(&self) -> Vec<String> {
-        self.values.keys().uniq().map(|k| k.0.clone()).collect()
+    pub fn groups(&self) -> impl Iterator<Item = &String> {
+        self.values.keys().uniq().map(|k| &k.0)
     }
 
-    // TODO: Vec<&str>? Iterator? var/val pair iterator?
     /// Get the list of variables set in the specified group.
-    pub fn variables_in_group(&self, group: &str) -> Vec<String> {
+    pub fn variables_in_group<'a>(&'a self, group: &'a str)
+    -> impl Iterator<Item = &'a String> {
         self.values.keys()
-            .filter_map(|k| {
-                if k.0 == group { Some(k.1.clone()) } else { None }
+            .filter_map(move |k| {
+                if k.0 == group { Some(&k.1) } else { None }
             })
-            .collect()
     }
 
     /// Retrieve the value of the specified variable within the DEFAULT group,

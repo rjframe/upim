@@ -338,7 +338,7 @@ fn read_config(path: &Path)
         };
     }
 
-    for coll in global.variables_in_group("Collections").iter() {
+    for coll in global.variables_in_group("Collections") {
         if conf.get("Collections", &coll).is_none() {
             conf = conf.set(
                 "Collections",
