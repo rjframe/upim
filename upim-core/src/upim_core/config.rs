@@ -31,13 +31,25 @@ use super::{
 };
 
 
-// TODO: We should probably have a separate directory setup for macOS.
+#[cfg(target_os = "macos")]
+static BUNDLE_ID: &str = "us.simplifysystems.uPIM";
 
 /// Read the standard uPIM configuration.
 ///
 /// Configurations are read from the following paths, in the following order:
 ///
-/// On UNIX-like operating systems:
+/// On macOS:
+///
+/// 1. `/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
+/// 2. `/etc/upim/upim.conf`
+/// 3. `~/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
+/// 4. `$HOME/.config/upim/upim.conf`
+/// 5. `<current working directory>/.upim.conf`
+///
+/// It is recommended to use #1 and #3 or #2 and #4, but not to mix the macOS
+/// and UNIX standard locations.
+///
+/// On other UNIX-like operating systems:
 ///
 /// 1. `/etc/upim/upim.conf`
 /// 2. `$XDG_CONFIG_HOME/upim/upim.conf` XOR `$HOME/.config/upim/upim.conf`
@@ -403,26 +415,39 @@ fn get_windows_paths() -> Option<Vec<PathBuf>> {
 /// locations of the configuration files.
 #[allow(dead_code)]
 fn get_unixy_dirs() -> Option<Vec<PathBuf>> {
-    use std::ffi::OsString;
-
     let mut paths = vec![];
+
+    #[cfg(target_os = "macos")]
+    if Path::new(concat!("/Library/Application Support/", BUNDLE_ID)).exists() {
+        paths.push(
+            PathBuf::from(concat!("/Library/Application Support/", BUNDLE_ID))
+        );
+    }
 
     if Path::new("/etc/upim").exists() {
         paths.push(PathBuf::from("/etc/upim"));
     }
 
-    let path = if let Some(mut p) = env::var_os("XDG_CONFIG_HOME") {
-        p.push(OsString::from("/upim"));
-        p
-    } else if let Some(mut p) = env::var_os("HOME") {
-        p.push(OsString::from("/.config/upim"));
-        p
+    let home = env::var_os("HOME");
+
+    #[cfg(target_os = "macos")]
+    if let Some(home) = home {
+        let p = home.join("Library/Application Support").join(BUNDLE_ID);
+        if p.exists() {
+            paths.push(PathBuf::from(p));
+        }
+    }
+
+    let path = if let Some(p) = env::var_os("XDG_CONFIG_HOME") {
+        Path::new(&p).join("upim")
+    } else if let Some(p) = home {
+        Path::new(&p).join(".config/upim")
     } else {
-        OsString::from("")
+        PathBuf::default()
     };
 
-    if Path::new(&path).exists() {
-        paths.push(PathBuf::from(path));
+    if path.exists() {
+        paths.push(path);
     }
 
     if ! paths.is_empty() {
