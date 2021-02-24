@@ -9,6 +9,18 @@ use anyhow::anyhow;
 
 use crate::filter::Condition;
 
+
+/// Describes the order in which to sort a field when outputting contact
+/// information.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Sort {
+    NoSort,
+    Ascending(String),
+    Descending(String),
+}
+
+impl Default for Sort { fn default() -> Self { Self::NoSort } }
+
 #[derive(Debug, Default)]
 pub struct Options {
     // A command or filter alias.
@@ -22,6 +34,7 @@ pub struct Options {
     pub filter: Option<Condition>,
     // Maximum number of records to list
     pub limit: Option<u32>,
+    pub sort: Sort,
 }
 
 impl Options {
@@ -84,6 +97,24 @@ impl Options {
                     args = &mut args[2..];
                 },
                 _ => {
+                    if args[0].starts_with("--sort-") && args[0].len() > 7 {
+                        if args.len() < 2 {
+                            return Err(anyhow!("Missing the field to sort by"));
+                        }
+
+                        let sort = match args[0].chars().nth(7) {
+                            Some('a') => Sort::Ascending(args[1].to_owned()),
+                            Some('d') => Sort::Descending(args[1].to_owned()),
+                            _ => return Err(anyhow!(
+                                "Unknown sort method: {}", args[0]
+                            )),
+                        };
+
+                        opts.sort = sort;
+                        args = &mut args[2..];
+                        continue;
+                    }
+
                     // TODO: We need the list of aliases from the configuration.
                     // Then we'll build the relevant filters.
                     panic!();
@@ -207,5 +238,31 @@ mod tests {
 
         let opts = Options::new(args).unwrap();
         assert_eq!(opts.limit, None);
+    }
+
+    #[test]
+    fn args_sort_ascending() {
+        let args = vec!["upim-contact", "--sort-a", "Name"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.sort, Sort::Ascending("Name".into()));
+    }
+
+    #[test]
+    fn args_sort_descending() {
+        let args = vec!["upim-contact", "--sort-d", "Name"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.sort, Sort::Descending("Name".into()));
+    }
+
+    #[test]
+    fn args_invalid_sort_is_err() {
+        let args = vec!["upim-contact", "--sort-b", "Name"];
+        let args = args.iter().map(|s| s.to_string());
+
+        assert!(Options::new(args).is_err());
     }
 }
