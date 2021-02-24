@@ -88,7 +88,7 @@ options.
 ### Libraries
 
 Use `cargo doc` to build the library documentation locally. You can list the
-full suite or specific subcrates as dependencies:
+full suite or specific subcrates as dependencies.
 
 I've not yet made a release or registered uPIM on crates.io, so clone the
 repository from git and add upim to your Cargo.toml as a local dependency:
@@ -144,7 +144,7 @@ This is a great meal to serve for guests.
 Mix the water and salt together. Let dry.
 ```
 
-Storing contact information:
+Storing contact information with recursive notes:
 
 ```
 @family @last-update:2000-01-01
@@ -202,6 +202,8 @@ _upim-conv_ | Conversions between Notes and other standard file formats
 
 ### Known Issues
 
+* Some string parsing assumes single-byte characters. No such functions are
+  data-corrupting.
 * Applications:
     * Documentation is unixy-centric.
     * *upim-edit*: Some invalid arguments may have incorrect error messages,
