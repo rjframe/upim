@@ -63,11 +63,11 @@ fn main() -> anyhow::Result<()> {
             let editor_arg = conf.get_default("editor_arg").map(|v| v.as_str());
             let (path, templ) = determine_file_path(&options, &conf)?;
 
-            if let Some(templ) = templ {
+            if let Some(ref templ) = templ {
                 fs::copy(templ, &path)?;
             };
 
-            launch_editor(editor, editor_arg, &path)?;
+            launch_editor(editor, editor_arg, &path, templ.as_deref())?;
         },
         Action::AddTags(tags) => {
             let mut note = Note::read_from_file(&options.file)?;
@@ -158,9 +158,13 @@ fn print_usage() {
 /// * arg    - an option, if necessary, to tell the editor not to fork and
 ///            detach from the shell that starts it.
 /// * path   - the path to a file to create or edit.
-fn launch_editor(editor: &str, arg: Option<&str>, path: &Path)
--> anyhow::Result<()>
-{
+/// * templ  - the path to the newly-created template file if applicable
+fn launch_editor(
+    editor: &str,
+    arg: Option<&str>,
+    path: &Path,
+    templ: Option<&Path>
+) -> anyhow::Result<()> {
     use std::{
         process::Command,
         time::SystemTime,
@@ -188,7 +192,6 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &Path)
         SystemTime::now()
     };
 
-    // TODO: Check exit code here?
     Command::new(editor)
         .args(args)
         .spawn()?
@@ -204,6 +207,17 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &Path)
     // validation if it's been modified. We only validate the header -- we
     // assume the document is properly-encoded UTF-8.
     if was_not_modified {
+        // If we just created the file from a template but the user did not
+        // modify it, we remove the file. We never remove a file in the
+        // templates directory.
+        if let Some(templ) = templ {
+            if path.parent() != templ.parent() {
+                // This can only happen if someone creates a collection pointing
+                // to it.
+                fs::remove_file(path)?
+            }
+        }
+
         Ok(())
     } else {
         match Note::validate_header(&path) {
@@ -217,7 +231,7 @@ fn launch_editor(editor: &str, arg: Option<&str>, path: &Path)
                 io::stdin().read_line(&mut inp)?;
 
                 match inp.trim() {
-                    "" | "y" | "Y" => launch_editor(editor, arg, path),
+                    "" | "y" | "Y" => launch_editor(editor, arg, path, None),
                     _ => Err(e.into()),
                 }
             },
