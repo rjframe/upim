@@ -578,8 +578,6 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
             Some('"') => (1, '"'),
-            // TODO: Only valid in a REF function (and the others are invalid).
-            Some('(') => (1, ')'),
             Some(_) => (0, ' '),
             None => return Err(anyhow!("Expected a field name"))
         };
