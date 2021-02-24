@@ -308,26 +308,27 @@ fn parse_split_function(s: &str, var: &str)
 -> std::result::Result<Function, FunctionParseError> {
     if let Some((field, sp)) = s.split_once(',') {
         if ! field_name_is_valid(field) {
+            return Err(FunctionParseError::InvalidArguments(field.into()));
+        }
+
+        let split_str = sp.trim();
+
+        if ! is_quoted(split_str) {
             return Err(FunctionParseError::InvalidArguments(
-                field.into()
+                "Expected string literal".into()
+            ));
+        }
+        if split_str.len() != 3 {
+            return Err(FunctionParseError::InvalidArguments(
+                "Expected a single-character separator".into()
             ));
         }
 
-        let split_str = sp.chars()
-            // TODO: This allows inputting a separator like: '  , '
-            .skip_while(|c| c.is_whitespace())
-            .collect::<Vec<char>>();
-
-        if split_str.len() != 3 && split_str[0] != split_str[1]
-            && (split_str[0] == '\'' || split_str[0] == '"')
-        {
-            return Err(FunctionParseError::InvalidArguments(
-                "Missing or invalid opening quotation for splitter"
-                .into()
-            ));
-        }
-
-        Ok(Function::Split(var.to_owned(), field.into(), split_str[1]))
+        Ok(Function::Split(
+            var.to_owned(),
+            field.into(),
+            split_str.chars().nth(1).unwrap()
+        ))
     } else {
         Err(FunctionParseError::InvalidArguments(
             "Invalid arguments to SPLIT function".into()
