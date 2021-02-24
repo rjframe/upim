@@ -66,24 +66,22 @@ use super::{
 ///
 /// This function will be updated to report what errors occured in the failure
 /// case.
-pub fn read_upim_configuration() -> Result<Config, Config> {
+pub fn read_upim_configuration() -> Result<Config, Vec<FileError>> {
     let conf_files = get_upim_configuration_paths().unwrap_or_default();
     let mut conf = Config::default();
-    let mut err_occured = false;
+    let mut errors = vec![];
 
-    // TODO: we'll want .iter().try_for_each().collect::Result<...>() instead.
     for file in conf_files.iter() {
-        if let Ok(c) = Config::read_from_file(file) {
-            conf = conf.merge_with(c);
-        } else {
-            err_occured = true;
-        }
+        match Config::read_from_file(file) {
+            Ok(c) => conf = conf.merge_with(c),
+            Err(mut e) => errors.append(&mut e),
+        };
     }
 
-    if err_occured {
-        Err(conf)
-    } else {
+    if errors.is_empty() {
         Ok(conf)
+    } else {
+        Err(errors)
     }
 }
 
@@ -145,21 +143,39 @@ pub struct Config {
 
 impl Config {
     /// Read a [Config] from the INI file at the path specified.
-    pub fn read_from_file(path: &Path) -> Result<Self, FileError> {
+    ///
+    /// # Returns
+    ///
+    /// Returns the configuration file if successfully read; otherwise returns a
+    /// list of errors that occurred while reading or parsing the file.
+    pub fn read_from_file(path: &Path) -> Result<Self, Vec<FileError>> {
         use std::{
             fs::File,
             io::{prelude::*, BufReader},
         };
 
-        let f = File::open(path)?;
+        let f = match File::open(path) {
+            Ok(f) => f,
+            Err(e) => return Err(vec![e.into()]),
+        };
+
         let mut reader = BufReader::new(f);
         let mut line = String::new();
         let mut cnt = 0;
 
+        let mut errors = vec![];
         let mut map = HashMap::new();
         let mut group = String::from("DEFAULT");
 
-        while reader.read_line(&mut line)? > 0 {
+        loop {
+            match reader.read_line(&mut line) {
+                Ok(len) => if len == 0 { break; },
+                Err(e) => {
+                    errors.push(e.into());
+                    continue;
+                }
+            };
+
             cnt += 1;
             line = line.trim().into();
             if line.is_empty() { continue; }
@@ -171,28 +187,43 @@ impl Config {
                 if line.ends_with(']') {
                     group = line[1..line.len()-1].trim().into();
                 } else {
-                    return Err(FileError::Parse {
+                    errors.push(FileError::Parse {
                         msg: "Missing closing bracket for group name".into(),
-                        data: line,
+                        data: line.to_owned(),
                         line: cnt,
                     });
                 }
             } else if let Some((var, val)) = line.split_once('=') {
+                // We'll allow empty values, but not variables.
+                let var = var.trim_end().to_string();
+
+                if var.is_empty() {
+                    errors.push(FileError::Parse {
+                        msg: "Assignment requires a variable name".into(),
+                        data: line.to_owned(),
+                        line: cnt,
+                    });
+                } else {
                     map.insert(
-                        (group.clone(), var.trim_end().to_string()),
+                        (group.clone(), var),
                         val.trim_start().to_string()
                     );
+                }
             } else {
-                return Err(FileError::Parse {
+                errors.push(FileError::Parse {
                     msg: "Expected a variable assignment".into(),
-                    data: line,
+                    data: line.to_owned(),
                     line: cnt,
                 });
             }
             line.clear();
         }
 
-        Ok(Self { values: map })
+        if errors.is_empty() {
+            Ok(Self { values: map })
+        } else {
+            Err(errors)
+        }
     }
 
     /// Write this configuration to the given file. If the file exists, it is
@@ -482,6 +513,12 @@ mod tests {
     }
 
     #[test]
+    fn nonexistent_file_is_err() {
+        let conf = Config::read_from_file(Path::new("nopath/notexist.conf"));
+        assert!(conf.is_err());
+    }
+
+    #[test]
     fn get_default_group() {
         let conf = Config::read_from_file(Path::new("test/test.ini")).unwrap();
 
@@ -514,5 +551,50 @@ mod tests {
 
         assert_eq!(conf["var1"], "val1");
         assert_eq!(conf["some-var"], "my-value");
+    }
+
+    #[test]
+    fn collect_all_parse_errors() {
+        let conf = Config::read_from_file(Path::new("test/invalid.ini"));
+        let errs = conf.unwrap_err();
+        let mut errs = errs.iter();
+
+        match errs.next() {
+            Some(FileError::Parse { msg, data, line }) => {
+                assert!(msg.contains("variable assignment"));
+                assert_eq!(data, "some variable");
+                assert_eq!(*line, 3);
+            },
+            _ => panic!("Expected a FileError::Parse"),
+        }
+
+        match errs.next() {
+            Some(FileError::Parse { msg, data, line }) => {
+                assert!(msg.contains("variable name"));
+                assert_eq!(data, "= some value");
+                assert_eq!(*line, 5);
+            },
+            _ => panic!("Expected a FileError::Parse"),
+        }
+
+        match errs.next() {
+            Some(FileError::Parse { msg, data, line }) => {
+                assert!(msg.contains("closing bracket"));
+                assert_eq!(data, "[Bad Group");
+                assert_eq!(*line, 7);
+            },
+            _ => panic!("Expected a FileError::Parse"),
+        }
+
+        match errs.next() {
+            Some(FileError::Parse { msg, data, line }) => {
+                assert!(msg.contains("variable assignment"));
+                assert_eq!(data, "# Bad comment");
+                assert_eq!(*line, 9);
+            },
+            _ => panic!("Expected a FileError::Parse"),
+        }
+
+        assert!(errs.next().is_none());
     }
 }

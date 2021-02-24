@@ -3,15 +3,15 @@
 use std::{
     error::Error,
     io,
-    fmt,
+    fmt::{self, Debug as _},
 };
 
 
 /// Error for file IO and parse errors.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FileError {
     #[allow(clippy::upper_case_acronyms)]
-    IO(io::Error),
+    IO(io::ErrorKind),
     Parse { msg: String, data: String, line: u32 },
 }
 
@@ -29,6 +29,6 @@ impl Error for FileError {}
 
 impl From<io::Error> for FileError {
     fn from(err: io::Error) -> FileError {
-        FileError::IO(err)
+        FileError::IO(err.kind())
     }
 }

@@ -17,12 +17,16 @@ mod args;
 use std::{
     path::{Path, PathBuf},
     env,
+    fmt,
     fs,
 };
 
 use anyhow::anyhow;
 
-use upim_core::config::*;
+use upim_core::{
+    config::*,
+    error::FileError,
+};
 use upim_note::Note;
 
 use crate::args::*;
@@ -47,7 +51,15 @@ fn main() -> anyhow::Result<()> {
             .or_else(find_default_configuration);
 
         if let Some(path) = path {
-            read_config(&path)?
+            match read_config(&path) {
+                Ok(conf) => conf,
+                Err(errors) => {
+                    for e in errors.iter() {
+                        eprintln!("Error: {}", e);
+                    }
+                    return Err(anyhow!("Failed to read configuration file."));
+                },
+            }
         } else {
             // TODO: If we can determine the editor from the environment we
             // currently don't need a configuration file.
@@ -57,8 +69,10 @@ fn main() -> anyhow::Result<()> {
 
     match options.action {
         Action::Edit => {
-            let editor = conf.get_default("editor").expect("No text editor set");
+            let editor = conf.get_default("editor")
+                .ok_or_else(|| anyhow!("No text editor configured"))?;
             let editor_arg = conf.get_default("editor_arg").map(|v| v.as_str());
+
             let (path, templ) = determine_file_path(&options, &conf)?;
 
             if let Some(ref templ) = templ {
@@ -237,13 +251,42 @@ fn launch_editor(
     }
 }
 
+/// Errors that can occur while reading information from our exteral
+/// environment.
+#[derive(Debug, Clone)]
+enum ConfigurationError {
+    Config(FileError),
+    Environment(String),
+}
+
+impl fmt::Display for ConfigurationError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ConfigurationError::Config(ref e) => e.fmt(f),
+            ConfigurationError::Environment(ref s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl std::error::Error for ConfigurationError {}
+
+impl From<FileError> for ConfigurationError {
+    fn from(err: FileError) -> ConfigurationError {
+        ConfigurationError::Config(err)
+    }
+}
+
 /// Read the global uPIM and the upim-edit configurations.
 ///
 /// # Arguments
 ///
 /// * path - The path of the upim-edit configuration file.
-fn read_config(path: &Path) -> anyhow::Result<Config> {
-    let mut conf = Config::read_from_file(path)?;
+fn read_config(path: &Path)
+-> std::result::Result<Config, Vec<ConfigurationError>> {
+    let mut conf = Config::read_from_file(path)
+        .map_err(|v| v.iter()
+            .map(|e| ConfigurationError::Config(e.clone()))
+                .collect::<Vec<ConfigurationError>>())?;
 
     if conf.get_default("editor").is_none() {
         let editor = env::var_os("EDITOR").map(|e| e.into_string());
@@ -252,7 +295,11 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
             if let Ok(editor) = editor {
                 conf = conf.set_default("editor", &editor);
             } else {
-                return Err(anyhow!("Cannot convert $EDITOR to a UTF-8 string"));
+                return Err(vec![
+                    ConfigurationError::Environment(
+                        "Cannot convert $EDITOR to a UTF-8 string".into()
+                    )
+                ]);
             }
         } else {
             conf = conf
@@ -274,8 +321,10 @@ fn read_config(path: &Path) -> anyhow::Result<Config> {
         // - nvim (headless mode not tested)
     }
 
-    // TODO: Once I can inspect errors, do so.
-    let global = read_upim_configuration().unwrap();
+    let global = read_upim_configuration()
+        .map_err(|v| v.iter()
+            .map(|e| ConfigurationError::Config(e.clone()))
+                .collect::<Vec<ConfigurationError>>())?;
 
     if conf.get_default("template_folder").is_none() {
         if let Some(folder) = global.get_default("template_folder") {
