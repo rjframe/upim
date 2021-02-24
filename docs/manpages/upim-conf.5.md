@@ -1,4 +1,4 @@
-% UPIM-CONF(5) upim configuration manual 0.1.0-prerelease
+% UPIM.CONF(5) upim configuration manual 0.1.0-prerelease
 % Ryan Frame (code@ryanjframe.com)
 % 2021 February
 
@@ -67,6 +67,66 @@ to the directory containing notes within that collection.
 
 # Standard uPIM Application Configuration Files
 
+## upim-contact
+
+upim-contact searches for the following files and uses the first one it finds:
+
+1. /etc/upim/upim-contact.conf
+2. $XDG_CONFIG_HOME/upim/upim-contact.conf (or
+   $HOME/.config/upim/upim-contact.conf if $XDG_CONFIG_HOME is unset)
+
+You can specify an alternative file via the **-C** option.
+
+
+### Default Group
+
+**default_collection** (required)
+: The collection to use when **-C** is not provided
+
+**field_separator**
+: The string or character to separate each field of a contact record when
+  printing to standard output
+
+Valid field separators are:
+
+- Any quoted string
+- Any UTF-8-encoded character
+- "{SPACE}" or "{TAB}"
+- A character code in the form "\\u*XXXX*"
+
+The default field separator is " | ".
+
+
+### Aliases Group
+
+The aliases group allows you to create pre-defined searches and run them as
+commands. Alias names cannot match a command name.
+
+An alias is a list of command-line arguments to be appended to
+**upim-contact**'s argument list. Aliases may use other aliases, but infinite
+recursion is possible -- **upim-contact** makes no attempt to analyze recursive
+aliases.
+
+Aliases may accept arguments in the form of parameter substitutions by using the
+dollar sign and zero-based index of the argument. If you need a literal dollar
+sign followed by an integer, use a backslash to escape it.
+
+There are two aliases defined in the default configuration file:
+
+    view = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1
+    find = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0'
+
+The **view** alias will display the name, phone number, and employer's name of
+the first contact that matches the filter. The **find** alias displays the same
+information for all contacts that match the filter. You may add filters when
+using an alias to further restrict the search.
+
+Example commands using each alias:
+
+    upim-contact view 'Some Person'
+    upim-contact find 'Some Person' --filter '* WHERE Phone NOT EMPTY'
+
+
 ## upim-edit
 
 upim-edit searches for the following files and uses the first one it finds:
@@ -75,7 +135,7 @@ upim-edit searches for the following files and uses the first one it finds:
 2. $XDG_CONFIG_HOME/upim/upim-edit.conf (or $HOME/.config/upim/upim-edit.conf if
    $XDG_CONFIG_HOME is unset)
 
-You can specify an alternative file via the `-C` option.
+You can specify an alternative file via the **-C** option.
 
 
 ### Default Group
