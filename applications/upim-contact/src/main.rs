@@ -5,6 +5,7 @@
 
 mod args;
 mod contact;
+mod either;
 mod filter;
 
 fn main() {

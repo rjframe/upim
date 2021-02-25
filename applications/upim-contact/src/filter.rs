@@ -134,13 +134,8 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Context as _};
 
+use crate::either::Either;
 
-/// Generic "either one or the other" type.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Either<T, U> {
-    Left(T),
-    Right(U),
-}
 
 /// Supported operators on filters.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
