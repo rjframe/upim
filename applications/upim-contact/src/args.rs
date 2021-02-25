@@ -135,7 +135,29 @@ impl Options {
                         opts.cmd_or_alias = Command::New(args[1].to_owned());
                         args = &mut args[2..];
                     } else if args[0] == "edit" {
-                        todo!()
+                        if args.len() < 2 {
+                            return Err(anyhow!(concat!(
+                                "Expected a contact name or path for the edit ",
+                                "command"
+                            )));
+                        }
+
+                        // The path to edit must exist, so we can use this to
+                        // validate it:
+                        match Path::new(&args[1]).canonicalize() {
+                            Ok(p) => {
+                                opts.cmd_or_alias = Command::Edit(
+                                    Either::Right(p)
+                                )
+                            },
+                            Err(_) => {
+                                // Invalid path; probably a name. Will be
+                                // validated later.
+                                opts.cmd_or_alias = Command::Edit(
+                                    Either::Left(args[1].to_owned())
+                                )
+                            },
+                        }
                     } else {
                         // TODO: We need the list of aliases from the
                         // configuration. Then we'll build the relevant filters.
