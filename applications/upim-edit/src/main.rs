@@ -9,9 +9,6 @@
 #![feature(bool_to_option)]
 #![feature(drain_filter)]
 
-// TODO: Instead of defaulting to vim, try the system's associated editor for
-// the file type first?
-
 mod args;
 
 use std::{
@@ -61,9 +58,9 @@ fn main() -> anyhow::Result<()> {
                 },
             }
         } else {
-            // TODO: If we can determine the editor from the environment we
-            // currently don't need a configuration file.
-            return Err(anyhow!("No configuration file found"));
+            // If we can determine the editor from the environment later we
+            // don't need a configuration file.
+            Config::default()
         }
     };
 
@@ -302,9 +299,11 @@ fn read_config(path: &Path)
                 ]);
             }
         } else {
-            conf = conf
-                .set_default("editor", "vim")
-                .set_default("editor_arg", "-f");
+            return Err(vec![
+                ConfigurationError::Environment(
+                    "No text editor is configured".into()
+                )
+            ]);
         }
     }
 
