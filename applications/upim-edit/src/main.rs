@@ -182,9 +182,7 @@ fn launch_editor(
 
     let mut args = vec![];
     if let Some(arg) = arg { args.push(arg); }
-    // TODO: Should probably fail on invalid UTF-8.
-    let p = path.to_string_lossy();
-    args.push(&p);
+    args.push(path.to_str().ok_or_else(|| anyhow!("Invalid path"))?);
 
     // If we cannot read the file's last modification time, we call it `now`;
     // we'll do the same later, effectively treating the file as always
