@@ -61,16 +61,13 @@ impl Options {
         while ! args.is_empty() {
             match args[0].as_ref() {
                 "-C" => {
-                    if args.len() < 2 {
-                        return Err(anyhow!("Missing collection name"));
-                    }
+                    enforce_len(&args, 2, "Missing collection name")?;
                     opts.collection = Some(args[1].to_owned());
                     args = &mut args[2..];
                 },
                 "--conf" => {
-                    if args.len() < 2 {
-                        return Err(anyhow!("Missing configuration path"));
-                    }
+                    enforce_len(&args, 2, "Missing configuration path")?;
+
                     if Path::new(&args[1]).exists() {
                         opts.conf_path = Some(PathBuf::from(&args[1]));
                         args = &mut args[2..];
@@ -81,9 +78,7 @@ impl Options {
                     }
                 },
                 "--filter" => {
-                    if args.len() < 2 {
-                        return Err(anyhow!("No query filter provided"));
-                    }
+                    enforce_len(&args, 2, "No query filter provided")?;
 
                     let filter = match opts.filter {
                         Some(f) => {
@@ -98,9 +93,7 @@ impl Options {
                     args = &mut args[2..];
                 },
                 "--limit" => {
-                    if args.len() < 2 {
-                        return Err(anyhow!("Expected limit value"));
-                    }
+                    enforce_len(&args, 2, "Expected limit value")?;
 
                     let limit = match args[1].parse::<u32>() {
                         Ok(v) => if v > 0 { Some(v) } else { None },
@@ -111,9 +104,7 @@ impl Options {
                 },
                 _ => {
                     if args[0].starts_with("--sort-") && args[0].len() > 7 {
-                        if args.len() < 2 {
-                            return Err(anyhow!("Missing the field to sort by"));
-                        }
+                        enforce_len(&args, 2, "Missing the field to sort by")?;
 
                         let sort = match args[0].chars().nth(7) {
                             Some('a') => Sort::Ascending(args[1].to_owned()),
@@ -127,20 +118,15 @@ impl Options {
                         args = &mut args[2..];
                         continue;
                     } else if args[0] == "new" {
-                        if args.len() < 2 {
-                            return Err(anyhow!(
-                                "Expected a contact name for the new command"
-                            ));
-                        }
+                        enforce_len(&args, 2,
+                            "Expected a contact name for the `new` command")?;
+
                         opts.cmd_or_alias = Command::New(args[1].to_owned());
                         args = &mut args[2..];
                     } else if args[0] == "edit" {
-                        if args.len() < 2 {
-                            return Err(anyhow!(concat!(
-                                "Expected a contact name or path for the edit ",
-                                "command"
-                            )));
-                        }
+                        enforce_len(&args, 2,
+                            concat!("Expected a contact name or path for the ",
+                                "edit command"))?;
 
                         // The path to edit must exist, so we can use this to
                         // validate it:
@@ -182,6 +168,15 @@ impl Options {
     fn is_valid(&self) -> bool {
         ! matches!(self.cmd_or_alias, Command::Search)
             || self.filter.is_some()
+    }
+}
+
+#[inline]
+fn enforce_len<T>(arr: &[T], cnt: usize, msg: &str) -> anyhow::Result<()> {
+    if arr.len() < cnt {
+        Err(anyhow!("{}", msg))
+    } else {
+        Ok(())
     }
 }
 
