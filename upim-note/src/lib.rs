@@ -43,7 +43,7 @@
 #![feature(with_options)]
 
 use std::{
-    collections::hash_map::{HashMap, Keys},
+    collections::HashMap,
     fs::File,
     io::Write,
     ops::{Index, IndexMut},
@@ -281,19 +281,12 @@ impl Note {
         self.map.contains_key(key)
     }
 
-    pub fn attribute_keys(&self) -> Keys<String, String> {
+    pub fn attribute_keys(&self) -> impl Iterator<Item = &String> {
         self.map.keys()
     }
 
-    // TODO: Return iterator
-    pub fn attributes(&self) -> Vec<(String, String)> {
-        let mut kv = vec![];
-
-        for key in self.map.keys() {
-            kv.push((key.into(), self.map[key].clone()));
-        }
-
-        kv
+    pub fn attributes(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.map.iter()
     }
 
     /// Get the note's content (document).

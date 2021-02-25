@@ -115,7 +115,7 @@ fn main() -> anyhow::Result<()> {
         Action::PrintAttributes => {
             let note = Note::read_header(&options.file)?;
 
-            for (k, v) in note.attributes().iter() {
+            for (k, v) in note.attributes() {
                 println!("{}:{}", k, v);
             }
         },
