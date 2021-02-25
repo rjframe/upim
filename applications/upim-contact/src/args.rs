@@ -7,7 +7,10 @@ use std::{
 
 use anyhow::anyhow;
 
-use crate::filter::Condition;
+use crate::{
+    either::Either,
+    filter::Condition,
+};
 
 
 /// Describes the order in which to sort a field when outputting contact
@@ -21,10 +24,20 @@ pub enum Sort {
 
 impl Default for Sort { fn default() -> Self { Self::NoSort } }
 
+#[derive(Debug)]
+pub enum Command {
+    Search,
+    Alias(String),
+    New(String),
+    Edit(Either<String, PathBuf>),
+}
+
+impl Default for Command { fn default() -> Self { Self::Search } }
+
 #[derive(Debug, Default)]
 pub struct Options {
     // A command or filter alias.
-    pub cmd_or_alias: String,
+    pub cmd_or_alias: Command,
     // The non-default collection to use.
     pub collection: Option<String>,
     // An alternate configuration file.
@@ -113,12 +126,24 @@ impl Options {
                         opts.sort = sort;
                         args = &mut args[2..];
                         continue;
+                    } else if args[0] == "new" {
+                        if args.len() < 2 {
+                            return Err(anyhow!(
+                                "Expected a contact name for the new command"
+                            ));
+                        }
+                        opts.cmd_or_alias = Command::New(args[1].to_owned());
+                        args = &mut args[2..];
+                    } else if args[0] == "edit" {
+                        todo!()
+                    } else {
+                        // TODO: We need the list of aliases from the
+                        // configuration. Then we'll build the relevant filters.
+                        return Err(anyhow!(
+                                "Unknown command or alias: {}", args[0]
+                        ));
                     }
-
-                    // TODO: We need the list of aliases from the configuration.
-                    // Then we'll build the relevant filters.
-                    panic!();
-                },
+                }
             }
         }
 
@@ -129,11 +154,12 @@ impl Options {
 impl Options {
     /// Determine whether this is a valid [Options] object.
     ///
-    /// If no command or alias was provided, then there must be a filter.
-    /// If there is a command/alias, a filter is optional.
+    /// If a command or alias was not provided ([Command::Search]), then there
+    /// must be a filter. If there is a command/alias, a filter is optional.
     #[allow(clippy::len_zero)]
     fn is_valid(&self) -> bool {
-        self.cmd_or_alias.len() > 0 || self.filter.is_some()
+        ! matches!(self.cmd_or_alias, Command::Search)
+            || self.filter.is_some()
     }
 }
 
