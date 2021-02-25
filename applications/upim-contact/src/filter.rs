@@ -474,30 +474,28 @@ impl FromStr for Filter {
     }
 }
 
-/// Return the (byte) index of the leftmost of any element in `patterns` in the
+/// Return the (char) index of the leftmost of any element in `patterns` in the
 /// given string.
 fn find_any_str<'a>(s: &str, patterns: &'a [&'a str])
 -> Option<(usize, &'a str)> {
-    let mut s = s;
+    let mut chars = s.chars();
     let mut i = 0;
 
-    while ! s.is_empty() {
+    loop {
         for p in patterns {
-            if s.starts_with(p) {
+            if chars.as_str().starts_with(p) {
                 return Some((i, p));
             }
         }
-
-        // TODO: This is invalid on multi-byte characters.
-        s = &s[1..s.len()];
         i += 1;
+        if chars.next().is_none() { break; };
     }
 
     None
 }
 
-/// Return the character (not byte) index of the leftmost of any element in
-/// `patterns` in the given string.
+/// Return the (char) index of the leftmost of any element in `patterns` in the
+/// given string.
 fn find_any(s: &str, patterns: &[char]) -> Option<(usize, char)> {
     s.chars()
         .enumerate()
