@@ -16,7 +16,6 @@ use rand::{
 use upim_note::Note;
 
 
-// TODO: Find a better way to do this.
 const UPIM_EDIT: &str = "../../target/debug/upim-edit";
 
 /// Retrieve a path to a non-existent file in a temporary directory.
