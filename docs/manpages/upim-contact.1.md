@@ -73,15 +73,21 @@ search aliases.
 Search aliases may have arguments; for example, the default **find** alias takes
 a string to match against contacts' Name fields:
 
-    upim-contact find 'Favorite Person'
+```shell
+$ upim-contact find 'Favorite Person'
+```
 
 The above command with the default "find" alias definition is equivalent to:
 
-    upim-contact --filter 'Name,Phone,Employer:Name' WHERE Name = 'Favorite Person'
+```shell
+$ upim-contact --filter 'Name,Phone,Employer:Name' WHERE Name = 'Favorite Person'
+```
 
 Filters may be provided to further limit results:
 
-    upim-contact find 'Favorite Person' --filter '* WHERE Phone NOT EMPTY'
+```shell
+$ upim-contact find 'Favorite Person' --filter '* WHERE Phone NOT EMPTY'
+```
 
 
 # CONFIGURATION
