@@ -80,7 +80,7 @@ in the `config` directory; to install them:
 Edit the configuration files -- at minimum, set the `template_folder` variable
 in upim.conf (upim.ini) and create your collections.
 
-See the [upim-conf(5)](docs/manpages/upim-conf.5.md) manual in the `docs`
+See the [upim-conf(5)](docs/manpages/upim-conf.5.scdoc) manual in the `docs`
 directory for more information about supported locations and the configurable
 options.
 

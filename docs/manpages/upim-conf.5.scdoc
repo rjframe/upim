@@ -1,21 +1,17 @@
-% UPIM.CONF(5) upim configuration manual 0.1.0-prerelease
-% Ryan Frame (code@ryanjframe.com)
-% 2021 February
+upim-conf(5) "0.1.0-prerelease" "upim configuration manual"
 
 # NAME
 
-upim-conf - uPIM configuration file(s)
-
+upim-conf - configuration file locations and settings for uPIM applications
 
 # DESCRIPTION
 
 uPIM is a collection of libraries and applications to form the building blocks
 for a personal information management system.
 
+# INI File Format
 
-## INI File Format
-
-uPIM uses a simple INI file format:
+All uPIM configuration files use a simple INI file format:
 
 - groups are created by naming them within brackets.
 - an equal sign ('=') is used for variable assignment.
@@ -26,16 +22,15 @@ uPIM uses a simple INI file format:
 - a semicolon (';') at the beginning of a line denotes a comment.
 - if a variable is set multiple times in a file, the last one read is kept.
 
+# CONFIGURATION FILE LOCATIONS
 
-## Configuration File Locations
+## File Locations for macOS
 
-### macOS
-
-1. `/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
-2. `/etc/upim/upim.conf`
-3. `/$HOME/Library/Application Support/us.simplifysystems.uPIM/upim.conf`
-4. `$HOME/.config/upim/upim.conf`
-5. `(current working directory)/.upim.conf`
+. /Library/Application Support/us.simplifysystems.uPIM/upim.conf
+. /etc/upim/upim.conf
+. /$HOME/Library/Application Support/us.simplifysystems.uPIM/upim.conf
+. $HOME/.config/upim/upim.conf
+. (current working directory)/.upim.conf
 
 It is recommended to use only the Library or only the non-Library directories,
 but not to mix configuration file locations between them.
@@ -44,39 +39,35 @@ Values set in later files override the earlier values, so the priority is in the
 reverse order of the list above.
 
 Applications built upon uPIM may place their own configuration files within a
-`upim` configuration directory.
+upim configuration directory.
 
-
-### Other UNIXy
+## File Locations for Other UNIXy OSes
 
 Configurations are read from the following paths, in the following order:
 
-1. `/etc/upim/upim.conf`
-2. `$XDG_CONFIG_HOME/upim/upim.conf` (or `$HOME/.config/upim/upim.conf` if
-   $XDG_CONFIG_HOME is not defined)
-3. `(current working directory)/.upim.conf`
+. /etc/upim/upim.conf
+. $XDG_CONFIG_HOME/upim/upim.conf (or $HOME/.config/upim/upim.conf if
+  $XDG_CONFIG_HOME is not defined)
+. (current working directory)/.upim.conf
 
 Values set in later files override the earlier values, so the priority is in the
 reverse order of the list above.
 
 Applications built upon uPIM may place their own configuration files within a
-`upim` configuration directory.
+upim configuration directory.
 
-
-# Global uPIM Configuration Variables
+# GLOBAL UPIM CONFIGURATION VARIABLES
 
 Some applications may override variables set from their own configuration files.
 
-
 ## Default Group
 
-**template_folder** (optional)
-: An absolute path to the directory that contains Note templates.
+*template_folder* (optional)
+	An absolute path to the directory that contains Note templates.
 
-**collection_base** (optional)
-: The (absolute) base path for relative paths in the Collections group. If not
-  specified, all collection paths must be absolute.
-
+*collection_base* (optional)
+	The (absolute) base path for relative paths in the Collections group. If not
+	specified, all collection paths must be absolute.
 
 ## Collections Group
 
@@ -84,28 +75,24 @@ The collections group has not predefined variables. Collections are defined by
 defining a variable of the collection's name with a value of the absolute path
 to the directory containing notes within that collection.
 
-
-# Standard uPIM Application Configuration Files
-
-## upim-contact
+# UPIM-CONTACT CONFIGURATION
 
 upim-contact searches for the following files and uses the first one it finds:
 
-1. /etc/upim/upim-contact.conf
-2. $XDG_CONFIG_HOME/upim/upim-contact.conf (or
-   $HOME/.config/upim/upim-contact.conf if $XDG_CONFIG_HOME is unset)
+. /etc/upim/upim-contact.conf
+. $XDG_CONFIG_HOME/upim/upim-contact.conf (or
+  $HOME/.config/upim/upim-contact.conf if $XDG_CONFIG_HOME is unset)
 
-You can specify an alternative file via the **-C** option.
+You can specify an alternative file via the *-C* option.
 
+## Default Group
 
-### Default Group
+*default_collection* (required)
+	The collection to use when **-C** is not provided
 
-**default_collection** (required)
-: The collection to use when **-C** is not provided
-
-**field_separator**
-: The string or character to separate each field of a contact record when
-  printing to standard output
+*field_separator*
+	The string or character to separate each field of a contact record when
+	printing to standard output
 
 Valid field separators are:
 
@@ -116,15 +103,14 @@ Valid field separators are:
 
 The default field separator is " | ".
 
-
-### Aliases Group
+## Aliases Group
 
 The aliases group allows you to create pre-defined searches and run them as
 commands. Alias names cannot match a command name.
 
 An alias is a list of command-line arguments to be appended to
-**upim-contact**'s argument list. Aliases may use other aliases, but infinite
-recursion is possible -- **upim-contact** makes no attempt to analyze recursive
+*upim-contact*'s argument list. Aliases may use other aliases, but infinite
+recursion is possible -- *upim-contact* makes no attempt to analyze recursive
 aliases.
 
 Aliases may accept arguments in the form of parameter substitutions by using the
@@ -133,54 +119,54 @@ sign followed by an integer, use a backslash to escape it.
 
 There are two aliases defined in the default configuration file:
 
-    view = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1
-    find = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0'
+```
+view = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1
+find = --filter 'Name,Phone,Employer:Name' WHERE Name = '$0'
+```
 
-The **view** alias will display the name, phone number, and employer's name of
-the first contact that matches the filter. The **find** alias displays the same
+The *view* alias will display the name, phone number, and employer's name of the
+first contact that matches the filter. The *find* alias displays the same
 information for all contacts that match the filter. You may add filters when
 using an alias to further restrict the search.
 
 Example commands using each alias:
 
-    upim-contact view 'Some Person'
-    upim-contact find 'Some Person' --filter '* WHERE Phone NOT EMPTY'
+```
+upim-contact view 'Some Person'
+upim-contact find 'Some Person' --filter '* WHERE Phone NOT EMPTY'
+```
 
-
-## upim-edit
+# UPIM-EDIT CONFIGURATION
 
 upim-edit searches for the following files and uses the first one it finds:
 
-1. /etc/upim/upim-edit.conf
-2. $XDG_CONFIG_HOME/upim/upim-edit.conf (or $HOME/.config/upim/upim-edit.conf if
-   $XDG_CONFIG_HOME is unset)
+. /etc/upim/upim-edit.conf
+. $XDG_CONFIG_HOME/upim/upim-edit.conf (or $HOME/.config/upim/upim-edit.conf if
+  $XDG_CONFIG_HOME is unset)
 
-You can specify an alternative file via the **-C** option.
+You can specify an alternative file via the *-C* option.
 
+## Default Group
 
-### Default Group
+*editor*
+	Specify the text editor to use. Required only if $EDITOR is not set or if
+	the $EDITOR requires an **editor_arg** that upim-edit does not recognize.
 
-**editor**
-: Specify the text editor to use. Required only if $EDITOR is not set or if the
-  $EDITOR requires an **editor_arg** that upim-edit does not recognize.
+*editor_arg*
+	A command-line argument to tell the editor to run in the background, if
+	required.
 
-**editor_arg**
-: A command-line argument to tell the editor to run in the background, if
-  required.
+*template_folder* (optional)
+	The global **template_folder** may be overridden.
 
-**template_folder** (optional)
-: The global **template_folder** may be overridden.
+*collection_base* (optional)
+	The global **collection_base** may be overridden.
 
-**collection_base** (optional)
-: The global **collection_base** may be overridden.
-
-
-### Collections Group
+## Collections Group
 
 The upim-edit configuration may append to or override the global collections.
 This is likely of use only to people using multiple configurations for different
 purposes (project-specific configurations, etc.).
-
 
 # FILES
 
@@ -190,10 +176,9 @@ $XDG_CONFIG_HOME/upim/upim.conf
 
 $HOME/.config/upim/upim.conf
 
-
 # EXAMPLES
 
-```ini
+```
 [DEFAULT]
 
 template_folder = /home/me/upim-templates
@@ -207,5 +192,5 @@ KB = /home/me/notes
 
 # SEE ALSO
 
-**upim**(7)
+*upim*(7)
 
