@@ -99,7 +99,7 @@ Valid field separators are:
 - Any quoted string
 - Any UTF-8-encoded character
 - "{SPACE}" or "{TAB}"
-- A character code in the form "\\u*XXXX*"
+- A Unicode character code in the form "\\u*XXXX*"
 
 The default field separator is " | ".
 

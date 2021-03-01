@@ -523,7 +523,7 @@ fn field_name_is_valid(field: &str) -> bool {
 
 /// Determine whether the provided string is surrounded by a single or double
 /// quotation mark.
-fn is_quoted(s: &str) -> bool {
+pub(crate) fn is_quoted(s: &str) -> bool {
     let mut ch = s.chars();
 
     match ch.next() {
