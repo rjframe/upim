@@ -148,6 +148,7 @@ fn read_config(path: Option<PathBuf>)
 #[derive(Debug, Clone)]
 pub enum ConfigurationError {
     Config(FileError),
+    InvalidValue { data: String, rules: String },
     MissingOption(String),
     Environment(String),
 }
@@ -156,6 +157,8 @@ impl fmt::Display for ConfigurationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ConfigurationError::Config(ref e) => e.fmt(f),
+            ConfigurationError::InvalidValue { ref data, ref rules } =>
+                write!(f, "Invalid value: {}. {}", data, rules),
             ConfigurationError::MissingOption(ref s) =>
                 write!(f, "Missing option: {}", s),
             ConfigurationError::Environment(ref s) => write!(f, "{}", s),
@@ -178,17 +181,13 @@ impl From<FileError> for ConfigurationError {
 ///   code itself.
 pub fn validate_field_separator(val: &str)
 -> std::result::Result<String, ConfigurationError> {
-    // TODO: Provide a validation callback in Config so it can pass errors
-    // along with the line number?
-
     use crate::filter::is_quoted;
 
     if val.len() > 1 && !is_quoted(val) {
-        return Err(ConfigurationError::Config(FileError::Parse {
-            msg: "field_separator strings must be quoted".into(),
+        return Err(ConfigurationError::InvalidValue {
             data: val.into(),
-            line: 0,
-        }))
+            rules: "field_separator strings must be quoted".into(),
+        })
     }
 
     let val = match is_quoted(val) {
@@ -202,12 +201,10 @@ pub fn validate_field_separator(val: &str)
     let val = match unescape_unicode(&val) {
         Ok(v) => v,
         Err(e) => {
-            // TODO: This should be a callback validator for Config.
-            return Err(ConfigurationError::Config(FileError::Parse {
-                msg: "Invalid Unicode escape sequence".into(),
+            return Err(ConfigurationError::InvalidValue {
                 data: e.0,
-                line: 0,
-            }));
+                rules: "Invalid Unicode escape sequence".into(),
+            });
         }
     };
 
