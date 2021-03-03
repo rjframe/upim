@@ -306,6 +306,7 @@ fn read_config(path: &Path)
     }
 
     if conf.get_default("editor_arg").is_none() {
+        // Safe to unwrap: we added it above if it was missing.
         let editor = conf.get_default("editor").unwrap();
 
         // If we know what argument an editor needs to tell it to run in the
