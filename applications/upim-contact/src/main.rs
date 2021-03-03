@@ -26,7 +26,7 @@ use upim_core::{
 };
 
 use args::{Command, Options};
-use filter::Filter;
+use filter::Query;
 
 
 fn main() -> anyhow::Result<()> {
@@ -45,7 +45,7 @@ fn main() -> anyhow::Result<()> {
         Command::Alias(ref name) => {
             match conf.get("Aliases", name) {
                 Some(alias) => {
-                    let alias = Filter::from_str(alias)?;
+                    let alias = Query::from_str(alias)?;
 
                     opts.filter.map(|f1| { alias.merge_with(f1) })
                 },

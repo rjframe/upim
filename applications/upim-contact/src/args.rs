@@ -9,7 +9,7 @@ use anyhow::anyhow;
 
 use crate::{
     either::Either,
-    filter::{Condition, Filter},
+    filter::Query,
 };
 
 
@@ -44,7 +44,7 @@ pub struct Options {
     pub conf_path: Option<PathBuf>,
     // Multiple conditions are ANDed together and stored as one.
     // If there is no cmd_or_alias, there must be a filter.
-    pub filter: Option<Filter>,
+    pub filter: Option<Query>,
     // Maximum number of records to list
     pub limit: Option<u32>,
     pub sort: Sort,
@@ -94,10 +94,10 @@ impl Options {
 
                     let filter = match opts.filter {
                         Some(f) => {
-                            let new_filter = Filter::from_str(&args[1])?;
+                            let new_filter = Query::from_str(&args[1])?;
                             Some(f.merge_with(new_filter))
                         },
-                        None => Some(Filter::from_str(&args[1])?)
+                        None => Some(Query::from_str(&args[1])?)
                     };
                     opts.filter = filter;
                     args = &mut args[2..];
@@ -194,7 +194,7 @@ fn enforce_len<T>(arr: &[T], cnt: usize, msg: &str) -> anyhow::Result<()> {
 mod tests {
     use super::*;
 
-    use crate::filter::FilterOp;
+    use crate::filter::{Condition, FilterOp};
 
     #[test]
     fn args_collection() {
@@ -226,7 +226,7 @@ mod tests {
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Filter {
+            Some(Query {
                 select: vec!["Name".into(), "Phone".into()],
                 condition: Condition::All,
             })
@@ -243,7 +243,7 @@ mod tests {
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Filter {
+            Some(Query {
                 select: vec!["Name".into(), "Phone".into()],
                 condition: Condition::Filter(
                     "Name".into(),
@@ -264,7 +264,7 @@ mod tests {
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Filter {
+            Some(Query {
                 select: vec!["*".into()],
                 condition: Condition::Filter(
                     "Name".into(),
@@ -287,7 +287,7 @@ mod tests {
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Filter {
+            Some(Query {
                 select: vec!["Name".into()],
                 condition:
                     Condition::And(Box::new((

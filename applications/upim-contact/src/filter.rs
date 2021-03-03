@@ -9,7 +9,7 @@
 //! ## Examples
 //!
 //! The below examples show how the command-line application is called. The
-//! string passed to the `--filter` option is parsed by [Filter::from_str].
+//! string passed to the `--filter` option is parsed by [Query::from_str].
 //!
 //! ```shell
 //! # Get the name of Favorite Person's employer
@@ -63,7 +63,7 @@
 //! All character and string literals are case-insensitive.
 //!
 //! ```ebnf
-//! Filter ::= FieldList ( 'WHERE' Condition )?
+//! Query ::= FieldList ( 'WHERE' Condition )?
 //!
 //! Condition ::=
 //!     FieldName Op StringLiteral
@@ -439,14 +439,14 @@ impl FromStr for Condition {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct Filter {
+pub struct Query {
     /// The fields to return.
     pub select: Vec<String>,
     /// The filter condition.
     pub condition: Condition,
 }
 
-impl FromStr for Filter {
+impl FromStr for Query {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self> {
@@ -476,8 +476,8 @@ impl FromStr for Filter {
     }
 }
 
-impl Filter {
-    pub fn merge_with(self, other: Filter) -> Filter {
+impl Query {
+    pub fn merge_with(self, other: Query) -> Query {
         let condition = Condition::And(Box::new((
             self.condition,
             other.condition,
@@ -493,7 +493,7 @@ impl Filter {
             .map(|s| s.to_owned())
             .collect();
 
-        Filter { select, condition }
+        Query { select, condition }
     }
 }
 
@@ -788,9 +788,9 @@ mod tests {
     fn parse_filter_all_contacts() {
         let text = "Name";
 
-        let filter = Filter::from_str(text).unwrap();
+        let filter = Query::from_str(text).unwrap();
         assert_eq!(filter,
-            Filter {
+            Query {
                 select: vec!["Name".into()],
                 condition: Condition::All,
             });
@@ -800,9 +800,9 @@ mod tests {
     fn parse_filter_all_quoted_contacts() {
         let text = "'Name'";
 
-        let filter = Filter::from_str(text).unwrap();
+        let filter = Query::from_str(text).unwrap();
         assert_eq!(filter,
-            Filter {
+            Query {
                 select: vec!["Name".into()],
                 condition: Condition::All,
             });
@@ -1074,9 +1074,9 @@ mod tests {
     fn parse_filter_by_field_value() {
         let text = "'Name' WHERE Name = 'Somebody'";
 
-        let filter = Filter::from_str(text).unwrap();
+        let filter = Query::from_str(text).unwrap();
         assert_eq!(filter,
-            Filter {
+            Query {
                 select: vec!["Name".into()],
                 condition: Condition::Filter(
                     "Name".into(),
