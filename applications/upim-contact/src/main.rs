@@ -26,7 +26,7 @@ use upim_core::{
 };
 
 use args::{Command, Options};
-use filter::Condition;
+use filter::Filter;
 
 
 fn main() -> anyhow::Result<()> {
@@ -45,11 +45,9 @@ fn main() -> anyhow::Result<()> {
         Command::Alias(ref name) => {
             match conf.get("Aliases", name) {
                 Some(alias) => {
-                    let cond1 = Condition::from_str(alias)?;
+                    let alias = Filter::from_str(alias)?;
 
-                    opts.filter.map(|cond2| {
-                        Condition::And(Box::new((cond1, cond2)))
-                    })
+                    opts.filter.map(|f1| { alias.merge_with(f1) })
                 },
                 None => return Err(anyhow!("Unknown alias: {}", name)),
             }
@@ -131,10 +129,12 @@ fn read_config(path: Option<PathBuf>)
         Err(e) => errors.push(e),
     }
 
+    /* TODO
     if let Err(mut errs) = validate_aliases(conf.variables_in_group("Aliases"))
     {
         errors.append(&mut errs);
     }
+    */
 
     if errors.is_empty() {
         Ok(conf)

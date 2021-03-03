@@ -9,7 +9,7 @@ use anyhow::anyhow;
 
 use crate::{
     either::Either,
-    filter::Condition,
+    filter::{Condition, Filter},
 };
 
 
@@ -44,18 +44,30 @@ pub struct Options {
     pub conf_path: Option<PathBuf>,
     // Multiple conditions are ANDed together and stored as one.
     // If there is no cmd_or_alias, there must be a filter.
-    pub filter: Option<Condition>,
+    pub filter: Option<Filter>,
     // Maximum number of records to list
     pub limit: Option<u32>,
     pub sort: Sort,
 }
 
 impl Options {
+    /// Parse options from the arguments list passed from the operating system.
+    ///
+    /// The first element is assumed to be the application name or path and is
+    /// ignored.
     pub fn new<T>(args: T) -> anyhow::Result<Self>
         where T: Iterator<Item = String>,
     {
-        let args = &mut args.collect::<Vec<String>>();
-        let mut args = &mut args[1..];
+        let mut args = args;
+        args.next();
+        Self::new_from_arguments(args)
+    }
+
+    /// Parse the list of arguments provided to the application.
+    pub(crate) fn new_from_arguments<T>(args: T) -> anyhow::Result<Self>
+        where T: Iterator<Item = String>,
+    {
+        let mut args = &mut args.collect::<Vec<String>>()[..];
         let mut opts = Options::default();
 
         while ! args.is_empty() {
@@ -82,12 +94,10 @@ impl Options {
 
                     let filter = match opts.filter {
                         Some(f) => {
-                            Some(Condition::And(Box::new((
-                                f,
-                                Condition::from_str(&args[1])?
-                            ))))
+                            let new_filter = Filter::from_str(&args[1])?;
+                            Some(f.merge_with(new_filter))
                         },
-                        None => Some(Condition::from_str(&args[1])?)
+                        None => Some(Filter::from_str(&args[1])?)
                     };
                     opts.filter = filter;
                     args = &mut args[2..];
@@ -209,44 +219,90 @@ mod tests {
     }
 
     #[test]
-    fn args_filter() {
-        let args = vec!["upim-contact", "--filter", "Name = 'Somebody'"];
+    fn args_filter_no_where_clause() {
+        let args = vec!["upim-contact", "--filter", "Name,Phone"];
         let args = args.iter().map(|s| s.to_string());
 
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Condition::Filter(
-                "Name".into(),
-                FilterOp::EqualTo,
-                "Somebody".into()
-            ))
+            Some(Filter {
+                select: vec!["Name".into(), "Phone".into()],
+                condition: Condition::All,
+            })
         );
     }
 
     #[test]
-    fn args_chain_filters() {
-        let args = vec![
-            "upim-contact", "--filter", "Name = 'Somebody'",
-            "--filter", "Name = 'Nobody'"
+    fn args_filter() {
+        let args = vec!["upim-contact", "--filter",
+            "'Name,Phone' WHERE Name = 'Somebody'"
         ];
         let args = args.iter().map(|s| s.to_string());
 
         let opts = Options::new(args).unwrap();
         assert!(opts.is_valid());
         assert_eq!(opts.filter,
-            Some(Condition::And(Box::new((
-                Condition::Filter(
+            Some(Filter {
+                select: vec!["Name".into(), "Phone".into()],
+                condition: Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
                     "Somebody".into()
-                ),
-                Condition::Filter(
+                )
+            })
+        );
+    }
+
+    #[test]
+    fn args_filter_all_fields() {
+        let args = vec!["upim-contact", "--filter",
+            "* WHERE Name = 'Somebody'"
+        ];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert!(opts.is_valid());
+        assert_eq!(opts.filter,
+            Some(Filter {
+                select: vec!["*".into()],
+                condition: Condition::Filter(
                     "Name".into(),
                     FilterOp::EqualTo,
-                    "Nobody".into()
+                    "Somebody".into()
                 )
-            ))))
+            })
+        );
+    }
+
+    #[test]
+    fn args_chain_filters() {
+        let args = vec![
+            "upim-contact", "--filter",
+            "Name,Phone WHERE Name = 'Somebody'",
+            "--filter", "Name,Address WHERE Name = 'Nobody'"
+        ];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert!(opts.is_valid());
+        assert_eq!(opts.filter,
+            Some(Filter {
+                select: vec!["Name".into()],
+                condition:
+                    Condition::And(Box::new((
+                    Condition::Filter(
+                        "Name".into(),
+                        FilterOp::EqualTo,
+                        "Somebody".into()
+                    ),
+                    Condition::Filter(
+                        "Name".into(),
+                        FilterOp::EqualTo,
+                        "Nobody".into()
+                    )
+                ))),
+            })
         );
     }
 

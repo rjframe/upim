@@ -5,7 +5,7 @@
 use std::collections::BTreeSet;
 
 
-pub(crate) struct UniqIterator<I, T> {
+pub struct UniqIterator<I, T> {
     source: I,
     seen: BTreeSet<T>,
 }
@@ -29,7 +29,7 @@ impl<I, T> Iterator for UniqIterator<I, T>
     }
 }
 
-pub(crate) trait Uniq<I, T>: Iterator {
+pub trait Uniq<I, T>: Iterator {
     fn uniq(self) -> UniqIterator<Self, T>
         where Self: Sized + Iterator<Item = T>,
               T: Ord,

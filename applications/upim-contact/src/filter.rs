@@ -134,6 +134,8 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Context as _};
 
+use upim_core::uniq::Uniq as _;
+
 use crate::either::Either;
 
 
@@ -439,9 +441,9 @@ impl FromStr for Condition {
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Filter {
     /// The fields to return.
-    select: Vec<String>,
+    pub select: Vec<String>,
     /// The filter condition.
-    condition: Condition,
+    pub condition: Condition,
 }
 
 impl FromStr for Filter {
@@ -471,6 +473,27 @@ impl FromStr for Filter {
         f.condition = Condition::from_str(&s)?;
 
         Ok(f)
+    }
+}
+
+impl Filter {
+    pub fn merge_with(self, other: Filter) -> Filter {
+        let condition = Condition::And(Box::new((
+            self.condition,
+            other.condition,
+        )));
+
+        let other_select = &other.select;
+
+        // TODO: When merging select fields, order probably
+        // doesn't matter anymore - sort the fields?
+        let select = self.select.iter()
+            .uniq()
+            .filter(|s| other_select.contains(s))
+            .map(|s| s.to_owned())
+            .collect();
+
+        Filter { select, condition }
     }
 }
 
