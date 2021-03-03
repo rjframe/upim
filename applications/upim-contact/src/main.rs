@@ -215,7 +215,31 @@ pub fn validate_aliases<'a, I>(aliases: I)
 -> std::result::Result::<(), Vec<ConfigurationError>>
     where I: Iterator<Item = &'a String>,
 {
-    todo!();
+    let mut errors = vec![];
+
+    // TODO: Take alias name as param for error messages.
+    // TODO: Real errors for Query::from_str so we can do better here.
+
+    for alias in aliases {
+        let parts = alias.split("--");
+        for part in parts {
+            // TODO: Validate all possible options
+            if let Some(filter) = part.strip_prefix("filter") {
+                if let Err(e) = Query::from_str(&filter.trim_start()) {
+                    errors.push(ConfigurationError::InvalidValue {
+                        data: format!("{}", e),
+                        rules: "Invalid filter".into(),
+                    });
+                }
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 #[derive(Debug)]
@@ -277,6 +301,36 @@ pub fn unescape_unicode(s: &str)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validate_default_aliases() {
+        let aliases = vec![
+            "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1",
+            "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0'",
+        ];
+        let aliases = aliases.iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+
+        assert!(validate_aliases(aliases.iter()).is_ok())
+    }
+
+    #[test]
+    fn error_when_validating_bad_filter() {
+        let aliases = vec![
+            "--filter Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1",
+            "--filter Name,Phone,Employer:Name' WHERE Name > '$0'",
+            "--filter 'Name,Phone,Employer:Name' WHERE",
+        ];
+
+        let aliases = aliases.iter()
+            .map(|s| vec![s.to_string()])
+            .collect::<Vec<Vec<String>>>();
+
+        for alias in aliases {
+            assert!(validate_aliases(alias.iter()).is_err())
+        }
+    }
 
     #[test]
     fn unescape_unicode_valid_input() {

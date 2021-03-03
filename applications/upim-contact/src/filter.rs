@@ -403,7 +403,7 @@ impl FromStr for Condition {
                     s = &s[len..s.len()].trim_start();
 
                     let (len, op) = read_op(s)?;
-                    s = &s[len..s.len()].trim_start();
+                    s = &s[len..s.len()].trim();
 
                     // The rest of the string should either be EMPTY, a string,
                     // or a number.
@@ -427,7 +427,7 @@ impl FromStr for Condition {
                     } else if s.parse::<f64>().is_ok() {
                         Ok(Condition::Filter(field, op, s.into()))
                     } else {
-                        Err(anyhow!("The string literal is not quoted"))
+                        Err(anyhow!("The string literal is not quoted: {}", s))
                     }
                 },
                 Err(e) => {

@@ -113,6 +113,11 @@ An alias is a list of command-line arguments to be appended to
 recursion is possible -- *upim-contact* makes no attempt to analyze recursive
 aliases.
 
+Unlike on the command-line, do not place quotes around the filter string:
+
+    At the command-line: upim-contact --filter "Name WHERE Phone NOT EMPTY"
+    Alias: --filter Name WHERE Phone NOT EMPTY
+
 Aliases may accept arguments in the form of parameter substitutions by using the
 dollar sign and zero-based index of the argument. If you need a literal dollar
 sign followed by an integer, use a backslash to escape it.
