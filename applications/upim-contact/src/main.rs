@@ -109,7 +109,7 @@ fn read_config(path: Option<PathBuf>)
         };
     } else {
         errors.push(ConfigurationError::Environment(
-            "No configuration file found".into()
+            "No upim-contact configuration file found".into()
         ));
         return Err(errors);
     };
@@ -126,12 +126,10 @@ fn read_config(path: Option<PathBuf>)
         Err(e) => errors.push(e),
     }
 
-    /* TODO
     if let Err(mut errs) = validate_aliases(conf.variables_in_group("Aliases"))
     {
         errors.append(&mut errs);
     }
-    */
 
     if errors.is_empty() {
         Ok(conf)
