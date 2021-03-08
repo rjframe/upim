@@ -159,7 +159,10 @@ impl Options {
                         // We cannot verify it here because that creates a
                         // circular dependency between reading the configuration
                         // file and reading these options.
+                        // TODO: Need to support substitution arguments for
+                        // aliases.
                         opts.cmd_or_alias = Command::Alias(args[0].to_owned());
+                        args = &mut args[1..];
                     }
                 }
             }
