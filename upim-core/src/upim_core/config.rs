@@ -141,6 +141,29 @@ pub fn get_upim_configuration_paths() -> Option<Vec<PathBuf>> {
     panic!();
 }
 
+/// Get the path to the first application configuration file discovered.
+///
+/// # Parameters
+///
+/// - name: The name (without file extension) of the configuration file to
+///         search for.
+pub fn find_application_configuration(name: &str) -> Option<PathBuf> {
+    let ext = if cfg!(windows) {
+        "ini"
+    } else {
+        "conf"
+    };
+
+    let mut paths = get_upim_configuration_dirs().unwrap_or_default();
+
+    paths.iter_mut()
+        .find_map(|p| {
+            p.push(name);
+            p.set_extension(ext);
+            p.exists().then_some(p.clone())
+        })
+}
+
 /// The key used to look up a configuration value.
 ///
 /// The key is a group/variable pair. The default group is "DEFAULT".

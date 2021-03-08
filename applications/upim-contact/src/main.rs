@@ -1,5 +1,4 @@
 #![feature(assoc_char_funcs)]
-#![feature(bool_to_option)]
 #![feature(iter_advance_by)]
 #![feature(option_result_contains)]
 #![feature(pattern)]
@@ -21,7 +20,7 @@ use std::{
 use anyhow::anyhow;
 
 use upim_core::{
-    config::{Config, get_upim_configuration_dirs},
+    config::{Config, find_application_configuration},
     error::FileError,
 };
 
@@ -70,24 +69,10 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-// TODO: Move to core::config -> take the filename to find. There's a copy in
-// upim-edit too.
 /// Get the path to the first upim-contact.conf file found (upim-contact.ini on
 /// Windows).
 fn find_default_configuration() -> Option<PathBuf> {
-    let filename = if cfg!(windows) {
-        "upim-contact.ini"
-    } else {
-        "upim-contact.conf"
-    };
-
-    let mut paths = get_upim_configuration_dirs().unwrap_or_default();
-
-    paths.iter_mut()
-        .find_map(|p| {
-            p.push(filename);
-            p.exists().then_some(p.clone())
-        })
+    find_application_configuration("upim-contact")
 }
 
 fn read_config(path: Option<PathBuf>)

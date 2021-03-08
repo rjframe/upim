@@ -352,19 +352,7 @@ fn read_config(path: &Path)
 /// Get the path to the first upim-edit.conf file found (upim-edit.ini on
 /// Windows).
 fn find_default_configuration() -> Option<PathBuf> {
-    let filename = if cfg!(windows) {
-        "upim-edit.ini"
-    } else {
-        "upim-edit.conf"
-    };
-
-    let mut paths = get_upim_configuration_dirs().unwrap_or_default();
-
-    paths.iter_mut()
-        .find_map(|p| {
-            p.push(filename);
-            p.exists().then_some(p.clone())
-        })
+    find_application_configuration("upim-edit")
 }
 
 /// Determine the path of the file to create or edit based on the specified
