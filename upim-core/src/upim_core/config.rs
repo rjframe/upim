@@ -223,6 +223,7 @@ impl Config {
                     group = line[1..line.len()-1].trim().into();
                 } else {
                     errors.push(FileError::Parse {
+                        file: path.to_owned(),
                         msg: "Missing closing bracket for group name".into(),
                         data: line.to_owned(),
                         line: cnt,
@@ -234,6 +235,7 @@ impl Config {
 
                 if var.is_empty() {
                     errors.push(FileError::Parse {
+                        file: path.to_owned(),
                         msg: "Assignment requires a variable name".into(),
                         data: line.to_owned(),
                         line: cnt,
@@ -246,6 +248,7 @@ impl Config {
                 }
             } else {
                 errors.push(FileError::Parse {
+                    file: path.to_owned(),
                     msg: "Expected a variable assignment".into(),
                     data: line.to_owned(),
                     line: cnt,
@@ -602,7 +605,8 @@ mod tests {
         let mut errs = errs.iter();
 
         match errs.next() {
-            Some(FileError::Parse { msg, data, line }) => {
+            Some(FileError::Parse { file, msg, data, line }) => {
+                assert!(*file == *PathBuf::from("test/invalid.ini"));
                 assert!(msg.contains("variable assignment"));
                 assert_eq!(data, "some variable");
                 assert_eq!(*line, 3);
@@ -611,7 +615,8 @@ mod tests {
         }
 
         match errs.next() {
-            Some(FileError::Parse { msg, data, line }) => {
+            Some(FileError::Parse { file, msg, data, line }) => {
+                assert!(*file == *PathBuf::from("test/invalid.ini"));
                 assert!(msg.contains("variable name"));
                 assert_eq!(data, "= some value");
                 assert_eq!(*line, 5);
@@ -620,7 +625,8 @@ mod tests {
         }
 
         match errs.next() {
-            Some(FileError::Parse { msg, data, line }) => {
+            Some(FileError::Parse { file, msg, data, line }) => {
+                assert!(*file == *PathBuf::from("test/invalid.ini"));
                 assert!(msg.contains("closing bracket"));
                 assert_eq!(data, "[Bad Group");
                 assert_eq!(*line, 7);
@@ -629,7 +635,8 @@ mod tests {
         }
 
         match errs.next() {
-            Some(FileError::Parse { msg, data, line }) => {
+            Some(FileError::Parse { file, msg, data, line }) => {
+                assert!(*file == *PathBuf::from("test/invalid.ini"));
                 assert!(msg.contains("variable assignment"));
                 assert_eq!(data, "# Bad comment");
                 assert_eq!(*line, 9);

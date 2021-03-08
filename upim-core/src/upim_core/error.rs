@@ -2,8 +2,9 @@
 
 use std::{
     error::Error,
+    path::PathBuf,
+    fmt,
     io,
-    fmt::{self, Debug as _},
 };
 
 
@@ -11,24 +12,28 @@ use std::{
 #[derive(Debug, Clone)]
 pub enum FileError {
     #[allow(clippy::upper_case_acronyms)]
-    IO(io::ErrorKind),
-    Parse { msg: String, data: String, line: u32 },
+    IO((PathBuf, io::ErrorKind)),
+    Parse { file: PathBuf, msg: String, data: String, line: u32 },
 }
 
 impl fmt::Display for FileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            FileError::IO(ref e) => e.fmt(f),
-            FileError::Parse { ref msg, ref data, ref line } =>
-                write!(f, "{} at line {}:\n\t{}", msg, line, data),
+            FileError::IO((ref file, ref e)) =>
+                write!(f, "{:?} in file {}", e, file.to_string_lossy()),
+            FileError::Parse { ref file, ref msg, ref data, ref line } =>
+                write!(f, "{} at line {} in {}:\n\t{}"
+                    , msg, line, file.to_string_lossy(), data),
         }
     }
 }
 
 impl Error for FileError {}
 
+// TODO: Find where I do this and probably convert from a tuple instead so I
+// have a path.
 impl From<io::Error> for FileError {
     fn from(err: io::Error) -> FileError {
-        FileError::IO(err.kind())
+        FileError::IO((PathBuf::default(), err.kind()))
     }
 }

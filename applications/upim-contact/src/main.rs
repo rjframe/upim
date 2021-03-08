@@ -75,7 +75,6 @@ fn find_default_configuration() -> Option<PathBuf> {
     find_application_configuration("upim-contact")
 }
 
-// TODO: ConfigurationError should report the file path too.
 fn read_config(path: Option<PathBuf>)
 -> std::result::Result<Config, Vec<ConfigurationError>> {
     let mut errors = vec![];
