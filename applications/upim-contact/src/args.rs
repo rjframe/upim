@@ -155,11 +155,11 @@ impl Options {
                             },
                         }
                     } else {
-                        // TODO: We need the list of aliases from the
-                        // configuration. Then we'll build the relevant filters.
-                        return Err(anyhow!(
-                                "Unknown command or alias: {}", args[0]
-                        ));
+                        // We're going to assume a valid alias for now.
+                        // We cannot verify it here because that creates a
+                        // circular dependency between reading the configuration
+                        // file and reading these options.
+                        opts.cmd_or_alias = Command::Alias(args[0].to_owned());
                     }
                 }
             }
