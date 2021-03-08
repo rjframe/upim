@@ -20,7 +20,7 @@ use std::{
 use anyhow::anyhow;
 
 use upim_core::{
-    config::{Config, find_application_configuration},
+    config::{Config, find_application_configuration, read_upim_configuration},
     error::FileError,
 };
 
@@ -75,31 +75,44 @@ fn find_default_configuration() -> Option<PathBuf> {
     find_application_configuration("upim-contact")
 }
 
+// TODO: ConfigurationError should report the file path too.
 fn read_config(path: Option<PathBuf>)
 -> std::result::Result<Config, Vec<ConfigurationError>> {
-    let path = path.or_else(find_default_configuration);
-
-    let mut conf = Config::default()
-        .set_default("field_separator", " | ");
-
     let mut errors = vec![];
 
-    if let Some(path) = path {
-        let config = Config::read_from_file(&path)
+    let mut conf = {
+        let global = read_upim_configuration()
+                .map_err(|v| v.iter()
+                    .map(|e| ConfigurationError::Config(e.clone()))
+                        .collect::<Vec<ConfigurationError>>());
+
+        let mut conf = Config::default();
+
+        match global {
+            Ok(c) => conf = c,
+            Err(errs) => errors = errs,
+        }
+
+        conf.set_default("field_separator", " | ")
+    };
+
+    let conf_path = path.or_else(find_default_configuration);
+
+    if let Some(conf_path) = conf_path {
+        let config = Config::read_from_file(&conf_path)
             .map_err(|v| v.iter()
                 .map(|e| ConfigurationError::Config(e.clone()))
                     .collect::<Vec<ConfigurationError>>());
 
         match config {
             Ok(c) => conf = conf.merge_with(c),
-            Err(errs) => errors = errs,
+            Err(mut errs) => errors.append(&mut errs),
         };
     } else {
-        return Err(vec![
-            ConfigurationError::Environment(
-                "No configuration file found".into()
-            )
-        ]);
+        errors.push(ConfigurationError::Environment(
+            "No configuration file found".into()
+        ));
+        return Err(errors);
     };
 
     if conf.get_default("default_collection").is_none() {
