@@ -1,6 +1,7 @@
 //! Command-line argument parsing
 
 use std::{
+    num::{ParseIntError, IntErrorKind},
     path::{Path, PathBuf},
     str::FromStr as _,
 };
@@ -12,6 +13,9 @@ use crate::{
     filter::Query,
 };
 
+
+// TODO: Read the configuration file separately from the rest so I can simplify
+// my alias management.
 
 /// Describes the order in which to sort a field when outputting contact
 /// information.
@@ -38,6 +42,8 @@ impl Default for Command { fn default() -> Self { Self::Search } }
 pub struct Options {
     // A command or filter alias.
     pub cmd_or_alias: Command,
+    // The parameters to substitute into the alias.
+    pub alias_params: Option<Vec<String>>,
     // The non-default collection to use.
     pub collection: Option<String>,
     // An alternate configuration file.
@@ -159,10 +165,27 @@ impl Options {
                         // We cannot verify it here because that creates a
                         // circular dependency between reading the configuration
                         // file and reading these options.
-                        // TODO: Need to support substitution arguments for
-                        // aliases.
                         opts.cmd_or_alias = Command::Alias(args[0].to_owned());
-                        args = &mut args[1..];
+
+                        if args.len() == 1 {
+                            args = &mut args[1..];
+                        } else {
+                            let mut params = vec![];
+
+                            for arg in args[1..].iter() {
+                                if arg.starts_with('-') { break; }
+                                params.push(arg.to_owned());
+                            }
+
+                            let (len, params) = if params.is_empty() {
+                                (0, None)
+                            } else {
+                                (params.len(), Some(params))
+                            };
+                            opts.alias_params = params;
+
+                            args = &mut args[len+1..];
+                        }
                     }
                 }
             }
@@ -170,6 +193,78 @@ impl Options {
 
         Ok(opts)
     }
+}
+
+/// Errors that can be returned when attempting to perform parameter
+/// substitution in aliases.
+#[derive(Debug)]
+pub enum AliasSubstitutionError {
+    /// An error attempting to parse an error as an integer.
+    ParseError(IntErrorKind),
+    /// A command-line argument was not provided as a value to the specified
+    /// parameter substitution index.
+    MissingValue(usize),
+}
+
+impl std::fmt::Display for AliasSubstitutionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+        match self {
+            Self::ParseError(kind) =>
+                write!(f, "Error parsing parameter index: {:?}", kind),
+            Self::MissingValue(i) =>
+                write!(f, "No value provided for the parameter ${}", i),
+        }
+    }
+}
+
+impl std::error::Error for AliasSubstitutionError {}
+
+impl From<ParseIntError> for AliasSubstitutionError {
+    fn from(e: ParseIntError) -> Self {
+        Self::ParseError(e.kind().to_owned())
+    }
+}
+
+/// Substitute strings from command-line arguments into the given alias.
+///
+/// The name of the alias itself should not be passed in `args`.
+///
+/// # Returns
+///
+/// Returns a tuple of the new alias string and the number of arguments read.
+pub fn substitute_alias(args: &[String], alias: &str)
+-> std::result::Result<(usize, String), AliasSubstitutionError> {
+    let mut new_alias = String::default();
+    let mut idx = 0;
+    let mut last = 0;
+
+    for (i, _) in alias.match_indices('$') {
+        // TODO: Check optimizer on this. The implementation iterates the
+        // string; I'd be better off to do `if i > 0 && alias[i..i+1]`.
+        if alias.chars().nth(i-1) == Some('\\') { continue; }
+
+        let num = alias[i+1..].chars()
+            .take_while(|c| c.is_numeric())
+            .collect::<String>();
+
+        let num_len = num.len() + 1; // Count the dollar sign.
+        let num = num.parse::<usize>()?;
+
+        if num >= args.len() {
+            return Err(AliasSubstitutionError::MissingValue(num));
+        }
+
+        new_alias.push_str(&alias[last..i]);
+        new_alias.push_str(&args[num]);
+
+        idx += 1;
+        last = i + num_len;
+    };
+
+    new_alias.push_str(&alias[last..]);
+
+    Ok((idx, new_alias))
 }
 
 impl Options {
@@ -366,5 +461,102 @@ mod tests {
         let args = args.iter().map(|s| s.to_string());
 
         assert!(Options::new(args).is_err());
+    }
+
+    #[test]
+    fn substitute_alias_no_substitution() {
+        let args = vec!["--limit", "1"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = 'Nobody'";
+
+        let (len, alias) = substitute_alias(&args, alias).unwrap();
+        assert_eq!(len, 0);
+        assert_eq!(alias, "--filter 'Name,Phone' WHERE Name = 'Nobody'");
+    }
+
+    #[test]
+    fn substitute_alias_values() {
+        let args = vec!["Some Person"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$0' --limit 1";
+
+        let (len, new_alias) = substitute_alias(&args, alias).unwrap();
+        assert_eq!(len, 1);
+        assert_eq!(new_alias,
+            "--filter 'Name,Phone' WHERE Name = 'Some Person' --limit 1"
+        );
+    }
+
+    #[test]
+    fn substitute_alias_escaped_dollar() {
+        let args = vec!["Some Person"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '\\$0' --limit 1";
+
+        let (len, new_alias) = substitute_alias(&args, alias).unwrap();
+        assert_eq!(len, 0);
+        assert_eq!(new_alias,
+            "--filter 'Name,Phone' WHERE Name = '\\$0' --limit 1"
+        );
+    }
+
+    #[test]
+    fn subsitute_multiple_aliases() {
+        let args = vec!["Some Person", "12345"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$0' AND Phone = '$1'";
+
+        let (len, new_alias) = substitute_alias(&args, alias).unwrap();
+        assert_eq!(len, 2);
+        assert_eq!(new_alias,
+            "--filter 'Name,Phone' WHERE Name = 'Some Person' \
+            AND Phone = '12345'"
+        );
+    }
+
+    #[test]
+    fn subsitute_alias_missing_value_is_err() {
+        let args = vec!["Some Person"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$0' AND Phone = '$1'";
+
+        assert!(substitute_alias(&args, alias).is_err());
+    }
+
+    #[test]
+    fn substitute_alias_extra_values_are_ignored() {
+        let args = vec!["Some Person", "12345"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$0' --limit 1";
+
+        let (len, new_alias) = substitute_alias(&args, alias).unwrap();
+        assert_eq!(len, 1);
+        assert_eq!(new_alias,
+            "--filter 'Name,Phone' WHERE Name = 'Some Person' --limit 1"
+        );
+    }
+
+    #[test]
+    fn substitute_alias_missing_index_is_err() {
+        let args = vec!["Some Person"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$' --limit 1";
+        assert!(substitute_alias(&args, alias).is_err());
+    }
+
+    #[test]
+    fn substitute_alias_invalid_index_is_err() {
+        let args = vec!["Some Person"];
+        let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+
+        let alias = "--filter 'Name,Phone' WHERE Name = '$a' --limit 1";
+        assert!(substitute_alias(&args, alias).is_err());
     }
 }

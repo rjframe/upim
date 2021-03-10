@@ -1,4 +1,5 @@
 #![feature(assoc_char_funcs)]
+#![feature(int_error_matching)]
 #![feature(iter_advance_by)]
 #![feature(option_result_contains)]
 #![feature(pattern)]
@@ -24,7 +25,7 @@ use upim_core::{
     error::FileError,
 };
 
-use args::{Command, Options};
+use args::{Command, Options, substitute_alias};
 use filter::Query;
 
 
@@ -44,9 +45,38 @@ fn main() -> anyhow::Result<()> {
         Command::Alias(ref name) => {
             match conf.get("Aliases", name) {
                 Some(alias) => {
-                    let alias = Query::from_str(alias)?;
+                    let alias = alias.strip_prefix("--filter")
+                        .unwrap_or(alias)
+                        .trim_start();
 
-                    opts.filter.map(|f1| { alias.merge_with(f1) })
+                    let alias = match opts.alias_params {
+                        Some(ref p) => {
+                            let (len, a) = substitute_alias(p, alias)?;
+
+                            if len != p.len() {
+                                return Err(anyhow!(
+                                    "Expected {} parameters, but received {}: \
+                                    {:?}",
+                                    len,
+                                    p.len(),
+                                    p
+                                ));
+                            }
+
+                            a
+                        },
+                        None => {
+                            // Check for missing values for parameter
+                            // substitutions. We get back a cloned alias, which
+                            // we'd need to do anyway.
+                            let (_, alias) = substitute_alias(&[], alias)?;
+                            alias
+                        },
+                    };
+
+                    let alias = Query::from_str(&alias)?;
+
+                    opts.filter.or(Some(alias))
                 },
                 None => return Err(anyhow!("Unknown alias: {}", name)),
             }
@@ -62,8 +92,9 @@ fn main() -> anyhow::Result<()> {
         },
     };
 
-    if let Some(_search) = search {
+    if let Some(search) = search {
         // TODO: Perform the search.
+        println!("* query: {:?}", search);
     };
 
     Ok(())
