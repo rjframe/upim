@@ -46,9 +46,10 @@ issue/PR or start a discussion.
 
 ## What Do I Need for Development?
 
-You will need the [Rust compiler](rust-lang.org/) and cargo build tool. If you
-wish to build the manpages or HTML documentation for uPIM applications you will
-need [pandoc](https://pandoc.org/).
+You will need the nightly version of the
+[Rust compiler](https://www.rust-lang.org/tools/install) and cargo build tool.
+If you wish to build the manpages you will need
+[scdoc](https://sr.ht/~sircmpwn/scdoc/).
 
 You can build the libraries and programs by running `cargo build` or run tests
 via `cargo test`. To build the manpages run `make` from the `docs/manpages`
