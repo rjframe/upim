@@ -74,12 +74,11 @@ Application sources are in the `applications` directory. Run
 in the `config` directory; to install them:
 
 * **Unixy:** Place the configuration files in `$HOME/.config/uPIM/`
-* **Windows:** Rename the file extensions to .ini, then place them in
-  `%APPDATA%\uPIM\`.
+* **Windows:** Place the configuration files in `%APPDATA%\uPIM\`.
 
 Edit the configuration files -- at minimum, set the `template_folder` variable
-in upim.conf (upim.ini) and create your collections. There are default
-configuration files in the config directory that provide a good starting place.
+in upim.conf and create your collections. There are default configuration files
+in the config directory that provide a good starting place.
 
 See the [upim-conf(5)](docs/manpages/upim-conf.5.scdoc) manual in the `docs`
 directory for more information about supported locations and the configurable

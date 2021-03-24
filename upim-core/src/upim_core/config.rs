@@ -57,9 +57,9 @@ static BUNDLE_ID: &str = "us.simplifysystems.uPIM";
 ///
 /// On Windows:
 ///
-/// 1. `%PROGRMDATA%\uPIM\upim.ini`
-/// 2. `%APPDATA\uPIM\upim.ini`
-/// 3. `<current working directory>\upim.ini`
+/// 1. `%PROGRMDATA%\uPIM\upim.conf`
+/// 2. `%APPDATA\uPIM\upim.conf`
+/// 3. `<current working directory>\upim.conf`
 ///
 /// Values set in later files override the earlier values, so the priority is in
 /// the reverse order of the list above.
@@ -148,18 +148,12 @@ pub fn get_upim_configuration_paths() -> Option<Vec<PathBuf>> {
 /// - name: The name (without file extension) of the configuration file to
 ///         search for.
 pub fn find_application_configuration(name: &str) -> Option<PathBuf> {
-    let ext = if cfg!(windows) {
-        "ini"
-    } else {
-        "conf"
-    };
-
     let mut paths = get_upim_configuration_dirs().unwrap_or_default();
 
     paths.iter_mut()
         .find_map(|p| {
             p.push(name);
-            p.set_extension(ext);
+            p.set_extension("conf");
             p.exists().then_some(p.clone())
         })
 }
@@ -416,7 +410,7 @@ fn get_windows_paths() -> Option<Vec<PathBuf>> {
     let mut dirs = get_windows_dirs().unwrap_or_default();
 
     for dir in dirs.iter_mut() {
-        dir.push("upim.ini");
+        dir.push("upim.conf");
         if dir.exists() {
             paths.push(dir.to_path_buf());
         }
@@ -424,7 +418,7 @@ fn get_windows_paths() -> Option<Vec<PathBuf>> {
 
     let mut pbuf = env::current_dir()
         .map_or_else(|_e| PathBuf::default(), |v| v);
-    pbuf.push(r"upim.ini");
+    pbuf.push(r"upim.conf");
 
     if pbuf.as_path().exists() {
         paths.push(pbuf);

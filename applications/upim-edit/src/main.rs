@@ -349,8 +349,7 @@ fn read_config(path: &Path)
     Ok(conf)
 }
 
-/// Get the path to the first upim-edit.conf file found (upim-edit.ini on
-/// Windows).
+/// Get the path to the first upim-edit.conf file found.
 fn find_default_configuration() -> Option<PathBuf> {
     find_application_configuration("upim-edit")
 }

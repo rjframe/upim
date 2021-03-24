@@ -100,8 +100,7 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Get the path to the first upim-contact.conf file found (upim-contact.ini on
-/// Windows).
+/// Get the path to the first upim-contact.conf file found.
 fn find_default_configuration() -> Option<PathBuf> {
     find_application_configuration("upim-contact")
 }
