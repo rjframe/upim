@@ -53,7 +53,8 @@ If you wish to build the manpages you will need
 
 You can build the libraries and programs by running `cargo build` or run tests
 via `cargo test`. To build the manpages run `make` from the `docs/manpages`
-directory.
+directory. You can generate and view API reference documentation by running
+`cargo doc --open`.
 
 
 ## Style Guidelines
@@ -81,12 +82,11 @@ core: Add uniq iterator
 ```
 
 If relevant, later paragraphs should provide context and explain anything that
-may not be apparent; e.g., if you made a design decision that may not be
+may not be apparent; for example, if you made a design decision that may not be
 obvious, why did you choose that over an alternative?
 
-Answer the question "why?"; we can see "what" from the code itself. For example,
-use "Fix typo in schedule documentation" rather than "Change schedull to
-schedule".
+Answer the question "why?"; we can see "what" from the code itself. Use "Fix
+typo in schedule documentation" rather than "Change schedull to schedule".
 
 Text should be wrapped at 72 characters.
 
@@ -116,7 +116,8 @@ It's best to keep commits small when possible, doing only one thing.
 
 PRs that are only cosmetic (style) fixes will typically not be accepted since
 this messes up `git blame`. Style-only commits in the code you're working with
-while doing something else are fine though.
+while doing something else are fine, but the style fixes should be in a separate
+commit from functional changes.
 
 
 ### Code Style
@@ -141,9 +142,9 @@ Place opening braces on the same line as the function declaration/if
 expression/etc. unless doing so would break the 80 column rule.
 
 
-#### Function Declarations
+#### Function Definitions
 
-If a function return value would cross 80 columns, place the `->` on the next
+If a function's return value would cross 80 columns, place the `->` on the next
 line at column 1. `where` clauses should be indented four spaces, and the
 opening brace should be placed on the next line on column 1.
 

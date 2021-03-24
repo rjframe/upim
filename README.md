@@ -3,9 +3,9 @@
 uPIM is a collection of libraries and applications to form the building blocks
 for a personal information management system.
 
-uPIM is currently at the earliest of stages. I am already using the note format
-for all my documents (knowledge base, recipes, contacts, etc.) but there is a
-lot of work still to do before most people will find any use from it.
+uPIM is currently early-stage software. I am already using the note format for
+all my documents (knowledge base, recipes, contacts, etc.) but there is a lot of
+work still to do before most people will find any use from it.
 
 The official repository for uPIM is on SourceHut at
 [https://git.sr.ht/~rjframe/upim](https://git.sr.ht/~rjframe/upim), with a
@@ -160,12 +160,12 @@ Storing contact information with recursive notes:
 [Name: Some Company]
 [Website: www.example.com]
 
-And there's plenty of room for whatever prose you wish to remember.
+And there's plenty of room for whatever prose you wish to record.
 ```
 
-Using notes for something like contacts provides more flexibility than vCard
-(add any arbitrary data you like), while being easily converted to and from
-vCard via standard (user-configurable) attributes.
+Using notes for something like contact management provides more flexibility than
+vCard, while being easily converted to and from vCard via standard
+(user-configurable) attributes.
 
 
 ### Applications
@@ -218,7 +218,7 @@ _upim-conv_ | Conversions between Notes and other standard file formats
 ## Contributing
 
 Patches and pull requests are welcome. For major features or breaking changes,
-please open an issue or start a discussion first so we can discuss what you
+please open a ticket or start a discussion first so we can discuss what you
 would like to do.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for pointers on getting set up. If you'd
