@@ -6,9 +6,11 @@ use std::{
 
 use anyhow::anyhow;
 use multimap::MultiMap;
+use walkdir::WalkDir;
 
 use upim_note::Note;
 
+use crate::filter::Query;
 
 /// Data structure to store the contact information for a person or group.
 ///
@@ -45,6 +47,12 @@ impl Contact {
         let mut parent = contact;
         let tags = parent.tags().to_vec();
 
+        // The first note's tags belong to the contact, so we'll remove them
+        // from the note itself.
+        for tag in &tags {
+            parent.remove_tag(&tag);
+        }
+
         loop {
             if let Ok(n) = Note::from_str(parent.content()) {
                 // If the child is a note, we no longer care about the content.
@@ -65,12 +73,12 @@ impl Contact {
         }
 
         let mut info = MultiMap::new();
-        let mut last_group = String::from("default");
+        let mut last_group = String::from("default"); // Key for the first note.
 
         for note in notes.iter() {
             if let Some(tag) = note.tags().first() {
                 // Remove the leading ampersand.
-                last_group = tag[1..tag.len()].to_lowercase();
+                last_group = tag[1..].to_lowercase();
             }
             info.insert(last_group.clone(), note.clone());
         }
@@ -139,6 +147,34 @@ impl Contact {
     pub fn groups(&self) -> Groups<String, Vec<Note>> {
         self.info.keys()
     }
+}
+
+pub fn read_contacts(path: &Path, filter: Query) -> anyhow::Result<Vec<Contact>>
+{
+    if ! path.is_dir() {
+        return Err(anyhow!("The contacts collection must be a directory"));
+    }
+
+    let mut contacts = vec![];
+
+    for entry in WalkDir::new(path).min_depth(1).follow_links(true) {
+        match entry {
+            Err(e) => {
+                if e.loop_ancestor().is_some() {
+                    continue;
+                } else {
+                    return Err(anyhow::Error::new(e));
+                }
+            },
+            Ok(entry) => {
+                if entry.file_type().is_file() {
+                    contacts.push(Contact::new_from_file(entry.path())?);
+                }
+            }
+        }
+    }
+
+    Ok(contacts)
 }
 
 #[cfg(test)]

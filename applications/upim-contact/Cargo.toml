@@ -10,3 +10,4 @@ upim-core = { path = "../../upim-core" }
 upim-note = { path = "../../upim-note" }
 anyhow = "1.0.38"
 multimap = { version = "0.8.2", default-features = false }
+walkdir = "2.3.1"

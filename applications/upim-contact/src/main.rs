@@ -12,7 +12,7 @@ mod either;
 mod filter;
 
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr as _,
     env,
     fmt,
@@ -26,6 +26,7 @@ use upim_core::{
 };
 
 use args::{Command, Options, substitute_alias};
+use contact::read_contacts;
 use filter::Query;
 
 
@@ -95,9 +96,34 @@ fn main() -> anyhow::Result<()> {
     if let Some(search) = search {
         // TODO: Perform the search.
         println!("* query: {:?}", search);
+
+        // unwrap: default_collection's presence is verified in `read_config`.
+        let collection = opts.collection.unwrap_or_else(||
+            conf.get_default("default_collection").unwrap().into());
+        let path = collection_path(&conf, &collection)?;
+
+        let contacts = read_contacts(&path, search)?;
+        println!("{:?}", contacts);
     };
 
     Ok(())
+}
+
+// TODO: Move this to upim_core? Most applications will need some form of this.
+fn collection_path(conf: &Config, name: &str) -> anyhow::Result<PathBuf> {
+    if let Some(path) = conf.get("Collections", name) {
+        let path = Path::new(path);
+
+        if path.is_absolute() {
+            Ok(PathBuf::from(path))
+        } else if let Some(base) = conf.get_default("collection_base") {
+            Ok(Path::new(base).join(path))
+        } else {
+            Err(anyhow!("Relative collection path without collection_base set"))
+        }
+    } else {
+        Err(anyhow!("Collection name {} not in configuration", name))
+    }
 }
 
 /// Get the path to the first upim-contact.conf file found.
