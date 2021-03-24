@@ -116,6 +116,11 @@ fn main() -> anyhow::Result<()> {
                 println!("{}:{}", k, v);
             }
         },
+        Action::PrintCollections => {
+            for coll in conf.variables_in_group("Collections") {
+                println!("{}", coll);
+            }
+        },
         Action::PrintContent => {
             let note = Note::read_from_file(&options.file)?;
             println!("{}", note.content());
@@ -139,7 +144,8 @@ fn print_usage() {
         "\t--conf <path>             - Use the specified configuration file\n",
         "\t--tags                    - Print the note's tags then exit\n",
         "\t--attributes              - Print the note's attributes then exit\n",
-        "\t--content                 - print the note's content then exit\n",
+        "\t--collections             - Print the collections then exit\n",
+        "\t--content                 - Print the note's content then exit\n",
         "\t--add-tags <tag>...       - Add one or more tags to the note\n",
         "\t--add-attr <name> <value> - Add or edit an attribute\n",
         "\t--remove-tags <tag>...    - Remove one or more tags from the note\n",

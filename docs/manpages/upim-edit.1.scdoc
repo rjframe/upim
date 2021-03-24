@@ -66,6 +66,9 @@ collection, the new note will be created from the template for that collection.
 *--attributes*
 	Print the note's attributes then exit
 
+*--collections*
+	Print the configured collections then exit
+
 *--content*
 	Print the content (document) portion of the note to standard output then
 	exit

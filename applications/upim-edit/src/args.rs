@@ -14,6 +14,7 @@ pub enum Action {
     RemoveAttribute(String),
     PrintTags,
     PrintAttributes,
+    PrintCollections,
     PrintContent,
     PrintHelp,
 }
@@ -74,6 +75,10 @@ impl Options {
                 },
                 "--attributes" => {
                     opts.action = Action::PrintAttributes;
+                    args = &mut args[1..];
+                },
+                "--collections" => {
+                    opts.action = Action::PrintCollections;
                     args = &mut args[1..];
                 },
                 "--content" => {
@@ -139,8 +144,9 @@ impl Options {
     }
 
     pub fn is_valid(&self) -> bool {
-        self.action == Action::PrintHelp || self.file != PathBuf::default() &&
-        if self.collection.is_some() {
+        self.action == Action::PrintCollections
+        || self.action == Action::PrintHelp || self.file != PathBuf::default()
+        && if self.collection.is_some() {
             ! self.file.is_absolute()
         } else {
             true
@@ -242,6 +248,15 @@ mod tests {
         let opts = Options::new(args).unwrap();
         assert_eq!(opts.file.to_str().unwrap(), "/tmp/some-file.txt");
         assert_eq!(opts.action, Action::PrintAttributes);
+    }
+
+    #[test]
+    fn args_collections() {
+        let args = vec!["upim-edit", "--collections"];
+        let args = args.iter().map(|s| s.to_string());
+
+        let opts = Options::new(args).unwrap();
+        assert_eq!(opts.action, Action::PrintCollections);
     }
 
     #[test]
