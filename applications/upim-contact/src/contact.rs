@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 
 use upim_note::Note;
 
-use crate::filter::Query;
+use crate::filter::{Condition, FilterOp, Query};
 
 /// Data structure to store the contact information for a person or group.
 ///
@@ -147,6 +147,89 @@ impl Contact {
     pub fn groups(&self) -> Groups<String, Vec<Note>> {
         self.info.keys()
     }
+
+    pub fn matches(&self, condition: &Condition) -> bool {
+        match condition {
+            Condition::All => true,
+            Condition::Filter(field, ref op, value) => {
+                let (group, field) = field.split_once(':')
+                    .unwrap_or(("default", field));
+
+                if let Some(info) = self.info.get(group) {
+                    let attr = if let Some(f) = info.get_attribute(field) {
+                        f
+                    } else {
+                        // If the operator is Not and the field doesn't exist,
+                        // count that as not matching.
+                        return *op == FilterOp::Not;
+                    };
+
+                    // TODO: On parse errors, return an error instead of false?
+                    match op {
+                        FilterOp::EqualTo => attr == value,
+                        FilterOp::LessThan => {
+                            let attr = if let Ok(a) = attr.parse::<f32>() {
+                                a
+                            } else {
+                                return false;
+                            };
+
+                            value.parse::<f32>()
+                                .and_then(|v| Ok(attr < v))
+                                .unwrap_or(false)
+                        },
+                        FilterOp::LessEq => {
+                            let attr = if let Ok(a) = attr.parse::<f32>() {
+                                a
+                            } else {
+                                return false;
+                            };
+
+                            value.parse::<f32>()
+                                .and_then(|v| Ok(attr <= v))
+                                .unwrap_or(false)
+                        },
+                        FilterOp::GreaterThan => {
+                            let attr = if let Ok(a) = attr.parse::<f32>() {
+                                a
+                            } else {
+                                return false;
+                            };
+
+                            value.parse::<f32>()
+                                .and_then(|v| Ok(attr > v))
+                                .unwrap_or(false)
+                        },
+                        FilterOp::GreaterEq => {
+                            let attr = if let Ok(a) = attr.parse::<f32>() {
+                                a
+                            } else {
+                                return false;
+                            };
+
+                            value.parse::<f32>()
+                                .and_then(|v| Ok(attr >= v))
+                                .unwrap_or(false)
+                        },
+                        FilterOp::Not => attr != value,
+                    }
+                } else {
+                    false
+                }
+            },
+            Condition::Function(ref func) => {
+                todo!();
+            },
+            Condition::And(inner) => {
+                let (lhs, rhs): &(Condition, Condition) = &**inner;
+                self.matches(lhs) && self.matches(rhs)
+            },
+            Condition::Or(inner) => {
+                let (lhs, rhs): &(Condition, Condition) = &**inner;
+                self.matches(lhs) || self.matches(rhs)
+            },
+        }
+    }
 }
 
 pub fn read_contacts(path: &Path, filter: Query) -> anyhow::Result<Vec<Contact>>
@@ -168,7 +251,11 @@ pub fn read_contacts(path: &Path, filter: Query) -> anyhow::Result<Vec<Contact>>
             },
             Ok(entry) => {
                 if entry.file_type().is_file() {
-                    contacts.push(Contact::new_from_file(entry.path())?);
+                    let contact = Contact::new_from_file(entry.path())?;
+
+                    if contact.matches(&filter.condition) {
+                        contacts.push(contact)
+                    }
                 }
             }
         }
@@ -283,5 +370,345 @@ mod tests {
         assert!(groups.contains(&&String::from("default")));
         assert!(groups.contains(&&String::from("employer")));
         assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn filter_equal() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Favorite Person".into()
+        );
+        let cond_true2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::EqualTo,
+            "123".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Other".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::EqualTo,
+            "12".into()
+        );
+        let cond_false3 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::EqualTo,
+            "a".into()
+        );
+
+        assert!(contact.matches(&cond_true1));
+        assert!(contact.matches(&cond_true2));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+        assert!(! contact.matches(&cond_false3));
+    }
+
+    #[test]
+    fn filter_less_than() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessThan,
+            "200".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::LessThan,
+            "Other".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessThan,
+            "12".into()
+        );
+        let cond_false3 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::LessThan,
+            "5".into()
+        );
+
+        assert!(contact.matches(&cond_true));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+        assert!(! contact.matches(&cond_false3));
+    }
+
+    #[test]
+    fn filter_less_equal() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true1 = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessEq,
+            "200".into()
+        );
+        let cond_true2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessEq,
+            "123".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::LessEq,
+            "Other".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessEq,
+            "20".into()
+        );
+        let cond_false3 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::LessEq,
+            "5".into()
+        );
+
+        assert!(contact.matches(&cond_true1));
+        assert!(contact.matches(&cond_true2));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+        assert!(! contact.matches(&cond_false3));
+    }
+
+    #[test]
+    fn filter_greater_than() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterThan,
+            "20".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::GreaterThan,
+            "Other".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterThan,
+            "123".into()
+        );
+        let cond_false3 = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterThan,
+            "200".into()
+        );
+        let cond_false4 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::GreaterThan,
+            "5".into()
+        );
+
+        assert!(contact.matches(&cond_true));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+        assert!(! contact.matches(&cond_false3));
+        assert!(! contact.matches(&cond_false4));
+    }
+
+    #[test]
+    fn filter_greater_equal() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true1 = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterEq,
+            "20".into()
+        );
+        let cond_true2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterEq,
+            "123".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::GreaterEq,
+            "Other".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::GreaterEq,
+            "200".into()
+        );
+        let cond_false3 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::GreaterEq,
+            "5".into()
+        );
+
+        assert!(contact.matches(&cond_true1));
+        assert!(contact.matches(&cond_true2));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+        assert!(! contact.matches(&cond_false3));
+    }
+
+    #[test]
+    fn filter_not_equal() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::Not,
+            "Other Person".into()
+        );
+        let cond_true2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::Not,
+            "12".into()
+        );
+        let cond_true3 = Condition::Filter(
+            "Stuff".into(),
+            FilterOp::Not,
+            "a".into()
+        );
+
+        let cond_false1 = Condition::Filter(
+            "Name".into(),
+            FilterOp::Not,
+            "Favorite Person".into()
+        );
+        let cond_false2 = Condition::Filter(
+            "Num".into(),
+            FilterOp::Not,
+            "123".into()
+        );
+
+        assert!(contact.matches(&cond_true1));
+        assert!(contact.matches(&cond_true2));
+        assert!(contact.matches(&cond_true3));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+    }
+
+    #[test]
+    fn filter_cond_and_cond() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true_a = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Favorite Person".into()
+        );
+        let cond_true_b = Condition::Filter(
+            "Num".into(),
+            FilterOp::EqualTo,
+            "123".into()
+        );
+
+        let cond_false_a = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessThan,
+            "10".into()
+        );
+        let cond_false_b = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Other Person".into()
+        );
+
+        let cond_true = Condition::And(
+            Box::new((cond_true_a.clone(), cond_true_b.clone())));
+        let cond_false1 = Condition::And(
+            Box::new((cond_true_a, cond_false_a.clone())));
+        let cond_false2 = Condition::And(
+            Box::new((cond_false_a, cond_false_b)));
+
+        assert!(contact.matches(&cond_true));
+        assert!(! contact.matches(&cond_false1));
+        assert!(! contact.matches(&cond_false2));
+    }
+
+    #[test]
+    fn filter_cond_or_cond() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true_a = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Favorite Person".into()
+        );
+        let cond_true_b = Condition::Filter(
+            "Num".into(),
+            FilterOp::EqualTo,
+            "123".into()
+        );
+
+        let cond_false_a = Condition::Filter(
+            "Num".into(),
+            FilterOp::LessThan,
+            "10".into()
+        );
+        let cond_false_b = Condition::Filter(
+            "Name".into(),
+            FilterOp::EqualTo,
+            "Other Person".into()
+        );
+
+        let cond_true1 = Condition::Or(
+            Box::new((cond_true_a.clone(), cond_true_b.clone())));
+        let cond_true2 = Condition::Or(
+            Box::new((cond_true_a, cond_false_b.clone())));
+        let cond_true3 = Condition::Or(
+            Box::new((cond_false_a.clone(), cond_true_b)));
+        let cond_false = Condition::Or(Box::new((cond_false_a, cond_false_b)));
+
+        assert!(contact.matches(&cond_true1));
+        assert!(contact.matches(&cond_true2));
+        assert!(contact.matches(&cond_true3));
+        assert!(! contact.matches(&cond_false));
     }
 }
