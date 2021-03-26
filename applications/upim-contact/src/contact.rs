@@ -155,11 +155,11 @@ impl Contact {
                 let (group, field) = field.split_once(':')
                     .unwrap_or(("default", field));
 
-                if let Some(info) = self.info.get(group) {
+                if let Some(info) = self.info.get(&group.to_lowercase()) {
                     let attr = if let Some(f) = info.get_attribute(field) {
                         f
                     } else {
-                        // If the operator is Not and the field doesn't exist,
+                        // If the operator is `Not` and the field doesn't exist,
                         // count that as not matching.
                         return *op == FilterOp::Not;
                     };
@@ -709,6 +709,33 @@ mod tests {
         assert!(contact.matches(&cond_true1));
         assert!(contact.matches(&cond_true2));
         assert!(contact.matches(&cond_true3));
+        assert!(! contact.matches(&cond_false));
+    }
+
+    #[test]
+    fn filter_in_group() {
+        let text = "\
+        [Name: Favorite Person]\n\
+        [Num: 123]\n\
+        \n\
+        @Employer\n\
+        [Name: Some Company]\n\
+        ";
+
+        let contact = Contact::new(Note::from_str(text).unwrap()).unwrap();
+
+        let cond_true = Condition::Filter(
+            "Employer:Name".into(),
+            FilterOp::EqualTo,
+            "Some Company".into()
+        );
+        let cond_false = Condition::Filter(
+            "Employer:Name".into(),
+            FilterOp::EqualTo,
+            "Favorite Person".into()
+        );
+
+        assert!(contact.matches(&cond_true));
         assert!(! contact.matches(&cond_false));
     }
 }
