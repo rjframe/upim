@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 
 use upim_note::Note;
 
-use crate::filter::{Condition, FilterOp, Query};
+use crate::filter::{Condition, FilterOp};
 
 /// Data structure to store the contact information for a person or group.
 ///
@@ -148,6 +148,18 @@ impl Contact {
         self.info.keys()
     }
 
+    /// Return the fields in the specified group.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the group is not present in the [Contact].
+    pub fn fields(&self, group: &str)
+    -> impl Iterator<Item = &String> {
+        self.info.get(&group.to_lowercase())
+            .map(|g| g.attribute_keys())
+            .unwrap()
+    }
+
     pub fn matches(&self, condition: &Condition) -> bool {
         match condition {
             Condition::All => true,
@@ -232,8 +244,8 @@ impl Contact {
     }
 }
 
-pub fn read_contacts(path: &Path, filter: Query) -> anyhow::Result<Vec<Contact>>
-{
+pub fn read_contacts(path: &Path, condition: Condition)
+-> anyhow::Result<Vec<Contact>> {
     if ! path.is_dir() {
         return Err(anyhow!("The contacts collection must be a directory"));
     }
@@ -253,7 +265,7 @@ pub fn read_contacts(path: &Path, filter: Query) -> anyhow::Result<Vec<Contact>>
                 if entry.file_type().is_file() {
                     let contact = Contact::new_from_file(entry.path())?;
 
-                    if contact.matches(&filter.condition) {
+                    if contact.matches(&condition) {
                         contacts.push(contact)
                     }
                 }
