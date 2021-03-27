@@ -175,7 +175,7 @@ impl Contact {
                             };
 
                             value.parse::<f32>()
-                                .and_then(|v| Ok(attr < v))
+                                .map(|v| attr < v)
                                 .unwrap_or(false)
                         },
                         FilterOp::LessEq => {
@@ -186,7 +186,7 @@ impl Contact {
                             };
 
                             value.parse::<f32>()
-                                .and_then(|v| Ok(attr <= v))
+                                .map(|v| attr <= v)
                                 .unwrap_or(false)
                         },
                         FilterOp::GreaterThan => {
@@ -197,7 +197,7 @@ impl Contact {
                             };
 
                             value.parse::<f32>()
-                                .and_then(|v| Ok(attr > v))
+                                .map(|v| attr > v)
                                 .unwrap_or(false)
                         },
                         FilterOp::GreaterEq => {
@@ -208,7 +208,7 @@ impl Contact {
                             };
 
                             value.parse::<f32>()
-                                .and_then(|v| Ok(attr >= v))
+                                .map(|v| attr >= v)
                                 .unwrap_or(false)
                         },
                         FilterOp::Not => attr != value,
