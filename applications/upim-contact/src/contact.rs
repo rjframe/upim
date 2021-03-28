@@ -61,7 +61,7 @@ impl Contact {
                 parent = n;
 
                 // An empty note is valid so we need to duplicate the else block
-                // below. TODO: Refactor this.
+                // below.
                 if parent.content().is_empty() {
                     notes.push(parent);
                     break;

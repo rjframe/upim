@@ -12,7 +12,7 @@ mod either;
 mod filter;
 
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     str::FromStr as _,
     env,
     fmt,
@@ -23,6 +23,7 @@ use anyhow::anyhow;
 use upim_core::{
     config::{Config, find_application_configuration, read_upim_configuration},
     error::FileError,
+    paths::collection_path,
 };
 
 use args::{Command, Options, substitute_alias};
@@ -184,23 +185,6 @@ fn print_contacts(contacts: &[Contact], fields: &[String], sep: &str) {
             print!("{}", sep);
         }
         println!();
-    }
-}
-
-// TODO: Move this to upim_core? Most applications will need some form of this.
-fn collection_path(conf: &Config, name: &str) -> anyhow::Result<PathBuf> {
-    if let Some(path) = conf.get("Collections", name) {
-        let path = Path::new(path);
-
-        if path.is_absolute() {
-            Ok(PathBuf::from(path))
-        } else if let Some(base) = conf.get_default("collection_base") {
-            Ok(Path::new(base).join(path))
-        } else {
-            Err(anyhow!("Relative collection path without collection_base set"))
-        }
-    } else {
-        Err(anyhow!("Collection name {} not in configuration", name))
     }
 }
 
@@ -382,7 +366,6 @@ pub fn unescape_unicode(s: &str)
 -> std::result::Result<String, UnescapeError> {
     let mut out_str = String::default();
 
-    // TODO: Check the optimizer on this.
     let is_not_hexadecimal = |c: char| {
         ! (char::is_numeric(c)
             || ('a'..='f').contains(&c)
