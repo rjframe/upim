@@ -39,7 +39,6 @@
 //! - The document could be more than just text. The current workaround would be
 //!   a header-only document with a [Ref: <url>] to another document.
 
-#![feature(str_split_once)]
 #![feature(with_options)]
 
 use std::{

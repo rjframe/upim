@@ -1,9 +1,7 @@
-#![feature(assoc_char_funcs)]
 #![feature(int_error_matching)]
 #![feature(iter_advance_by)]
 #![feature(option_result_contains)]
 #![feature(pattern)]
-#![feature(str_split_once)]
 #![allow(dead_code)] // TODO: Only for early development
 
 mod args;
