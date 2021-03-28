@@ -49,7 +49,7 @@ See *upim-contact*(5) for details on the contact note format.
 *--sort-d* _FIELD-NAME_
 	Sort contacts by the given field in descending order
 
-# Commands
+## Commands
 
 *new* _NAME_
 	Create a new contact with the given name in the default collection
@@ -57,7 +57,86 @@ See *upim-contact*(5) for details on the contact note format.
 *edit* _NAME_ | _FILE_
 	Edit the given file or first discovered contact with the specified name
 
-# Search Aliases
+# FILTER SYNTAX
+
+Filters are SQL SELECT-like queries to filter the list of all contacts that can
+be read. Filters are of the form "field-list WHERE restrictions". The WHERE
+subclause is optional; if not present, all contacts are printed.
+
+Fields within categories can be displayed by separating the category name and
+field name with a colon. For example, given the contact:
+
+```
+[Name: Favorite Person]
+
+@Employer
+[Name: Some Company]
+```
+
+You can select the contact's name with "Name" and the employer's name with
+"Employer:Name".
+
+The WHERE clause is comprised of one or more comparisons or function calls.
+Filters can be joined via "AND" or "OR":
+
+```
+upim-contact \
+    --filter "Name WHERE Name NOT 'Nobody' AND Employer:Name = 'Some Company'"
+```
+
+## Comparison Operators
+
+[[ *Operator Type*
+:[ *Symbol*
+:[ *Example*
+|  Equal to
+:  =
+:  Name = 'Some Person'
+|  Less than
+:  <
+:  Employer:Income < 100000
+|  Less than or equal to
+:  <=
+:  Employer:Income <= 100000
+|  Greater than
+:  >
+:  "Parking Tickets" > 4
+|  Greater than or equal to
+:  >=
+:  "Parking Tickets" >= 4
+|  Not equal to
+:  NOT
+:  Spouse:Name NOT ""
+
+With the = and NOT operators, upim-contact performs string comparisons. For all
+other operators, the value is converted to a floating-point number prior to
+performing the comparison. If the value is unable to be parsed as a numeric
+value, upim-contact will display an error message.
+
+
+## Query Functions
+
+Query functions are not yet implemented. This section documents the planned
+functions and their behavior.
+
+[[ *Function*
+:[ *Description*
+|  REF(field-name)
+:  Reference the specified field as a subcontact. Other portions of the query
+   may refer to that subcontact. For example: with "s = REF(Spouse)" a contact
+   with the name listed in the Spouse field is linked with the name "s" and its
+   fields can be used like any other field: "s.Phone".
+|  SPLIT(field-name,separator)
+:  Split the given field via _separator_ into multiple fields. The rest of the
+   query will operate on each created field individually (this effectively works
+   like "for each subfield in fields").
+|  REGEX(field-name, regex)
+:  Filter the result set to only include contacts in which the values of the
+   given field match the regular expression.
+
+See the _EXAMPLES_ section for examples using each function.
+
+# SEARCH ALIASES
 
 Search aliases are commands defined in *upim-contact.conf* to provide
 pre-defined filters. See *upim-conf*(5) for information on creating search
