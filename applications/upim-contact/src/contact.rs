@@ -276,6 +276,87 @@ pub fn read_contacts(path: &Path, condition: Condition)
     Ok(contacts)
 }
 
+/// Retrieve a list of fields containing every attribute used by every contact
+/// passed to the function.
+pub fn get_all_fields(contacts: &[Contact]) -> Vec<(&str, &str)> {
+    use std::collections::HashSet;
+
+    // TODO: For a small number of fields, a Vec will be faster; especially if
+    // we sort the entries. It's probably worth getting some real-world
+    // benchmarks in the future.
+    let mut known_fields = HashSet::new();
+
+    for contact in contacts {
+        for group in contact.groups() {
+            for field in contact.fields(&group) {
+                known_fields.insert((group, field));
+            }
+        }
+    }
+    known_fields.drain().map(|(g, f)| (g.as_str(), f.as_str())).collect()
+}
+
+/// Print the specified fields in the list of contacts, using the provided
+/// separator.
+pub fn print_contacts(contacts: &[Contact], fields: &[String], sep: &str) {
+    use std::cmp::max;
+
+    let fields = if fields.len() == 1 && fields[0] == "*" {
+        get_all_fields(contacts)
+    } else {
+        fields.iter()
+            .map(|f| f.split_once(':').unwrap_or(("default", f)))
+            .collect()
+    };
+
+    let mut table = vec![];
+    let mut header = vec![];
+
+    let mut lengths = vec![];
+    lengths.resize(fields.len(), 0);
+
+    for i in 0..fields.len() {
+        let field_len = fields[i].0.len() + fields[i].1.len() + 1;
+        lengths[i] = max(lengths[i], field_len);
+
+        if fields[i].0 == "default" {
+            header.push(fields[i].1.to_owned());
+        } else {
+            let mut h = fields[i].0.to_owned();
+            h.push(':');
+            h.push_str(fields[i].1);
+
+            header.push(h);
+        }
+    }
+
+    table.push(header);
+
+    for contact in contacts {
+        let mut row = vec![];
+
+        for (i, field) in fields.iter().enumerate() {
+            let (group, field) = field;
+
+            let field_data = contact.get_field_from(group, field)
+                .cloned()
+                .unwrap_or_else(String::default);
+
+            lengths[i] = max(lengths[i], field_data.len());
+            row.push(field_data);
+        }
+        table.push(row);
+    }
+
+    for row in table {
+        for (i, column) in row.iter().enumerate() {
+            print!("{1:0$}", lengths[i], column);
+            print!("{}", sep);
+        }
+        println!();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
