@@ -160,6 +160,7 @@ impl Options {
                                 )
                             },
                         }
+                        args = &mut args[2..];
                     } else {
                         // We're going to assume a valid alias for now.
                         // We cannot verify it here because that creates a

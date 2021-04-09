@@ -99,9 +99,38 @@ fn main() -> anyhow::Result<()> {
 
             None
         },
-        Command::Edit(_name) => {
-            // TODO: match name
-            todo!();
+        Command::Edit(name) => {
+            let collection = if let Some(coll) = &opts.collection {
+                coll
+            } else {
+                &conf["default_collection"]
+            };
+
+            if name.is_left() {
+                let name = name.left().unwrap();
+                let name = normalized_name(
+                    &name,
+                    &collection_path(&conf, &collection)?
+                )?;
+
+                Proc::new("upim-edit")
+                    .args(&["-C", collection, &name])
+                    .spawn()?
+                    .wait()?;
+            } else {
+                let path = name.right().unwrap();
+                let path = if path.is_relative() {
+                    Path::new(collection).join(path)
+                } else {
+                    path.to_owned()
+                };
+
+                Proc::new("upim-edit")
+                    .args(&[path.to_str().unwrap()])
+                    .spawn()?
+                    .wait()?;
+            }
+
             None
         },
     };
@@ -123,28 +152,57 @@ fn main() -> anyhow::Result<()> {
 fn new_normalized_name(name: &str, def_collection_path: &Path) -> String {
     use std::path::PathBuf;
 
-    // TODO: Replace all invalid filename characters for Windows, Mac, Linux
-    let name = name.replace(' ', "_");
     let path = PathBuf::from(def_collection_path);
+    let filename = normalize_contact_name(name);
 
     let mut i = 0;
     loop {
-        let mut filename = if i > 0 {
-            let mut n = name.clone();
-            n.push_str(&i.to_string());
-            n
-        } else {
-            name.clone()
-        };
-
-        filename.push_str(".contact");
+        let filename = add_name_index_and_ext(&filename, i);
 
         if ! path.join(&filename).exists() {
             // TODO: Check fs::metadata for errors. Inability to access the
             // filesystem will be an infinite loop.
             break filename;
         } else {
-            i+= 1;
+            i += 1;
         }
     }
+}
+
+fn normalized_name(name: &str, def_collection_path: &Path)
+-> anyhow::Result<String> {
+    use std::fs::read_dir;
+
+    let name = normalize_contact_name(name);
+
+    let mut files = read_dir(def_collection_path)?
+        .map(|r| r.map(|e| e.path())).filter_map(|r| r.ok())
+        .filter(|p| p.is_file())
+        // TODO: Verify this unwrap is safe - I'm about 95% sure.
+        .map(|p| p.file_stem().unwrap().to_string_lossy().into_owned())
+        .filter(|f| f.starts_with(&name))
+        .collect::<Vec<String>>();
+
+    if ! files.is_empty() {
+        files.sort();
+        let f = &mut files[0];
+        f.push_str(".contact");
+        Ok(f.to_owned())
+    } else {
+        Err(anyhow!("Contact '{}' not found", name))
+    }
+}
+
+fn normalize_contact_name(name: &str) -> String {
+    // TODO: Replace all invalid filename characters for Windows, Mac, Linux
+    name.replace(' ', "_")
+}
+
+fn add_name_index_and_ext(name: &str, idx: u32) -> String {
+    let mut name = name.to_owned();
+    if idx > 0 {
+        name.push_str(&idx.to_string());
+    }
+    name.push_str(".contact");
+    name
 }
