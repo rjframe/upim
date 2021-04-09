@@ -5,7 +5,7 @@ for a personal information management system.
 
 uPIM is currently early-stage software. I am already using the note format for
 all my documents (knowledge base, recipes, contacts, etc.) but there is a lot of
-work still to do before most people will find any use from it.
+work still to do before most people will find much use from it.
 
 The official repository for uPIM is on SourceHut at
 [https://git.sr.ht/~rjframe/upim](https://git.sr.ht/~rjframe/upim), with a
@@ -67,13 +67,13 @@ All source code is licensed under the terms of the
 
 ### Application Installation
 
-Rust nightly is required.
+Rust nightly is currently required.
 
 Application sources are in the `applications` directory. Run
 `cargo build --release` to build them. Default configuration files are provided
 in the `config` directory; to install them:
 
-* **Unixy:** Place the configuration files in `$HOME/.config/uPIM/`
+* **Unixy:** Place the configuration files in `$HOME/.config/upim/`
 * **Windows:** Place the configuration files in `%APPDATA%\uPIM\`.
 
 Edit the configuration files -- at minimum, set the `template_folder` variable
@@ -91,7 +91,7 @@ Use `cargo doc` to build the library documentation locally. You can list the
 full suite or specific subcrates as dependencies.
 
 I've not yet made a release or registered uPIM on crates.io, so clone the
-repository from git and add upim to your Cargo.toml as a local dependency:
+repository and add upim to your Cargo.toml as a local dependency:
 
 ```toml
 [dependencies]
@@ -177,12 +177,12 @@ The uPIM applications are designed to:
 
 Applications listed below in _italics_ have not yet been created.
 
-Name           | Description
--------------- | ----------------------------------------------------------
-upim-edit      | Wraps your text editor to edit notes, manages note headers
-_upim-find_    | Searches uPIM collections
-_upim-contact_ | Contact manager
-_upim-cal_     | Calendar integration
+Name         | Description
+------------ | ----------------------------------------------------------
+upim-edit    | Wraps your text editor to edit notes, manages note headers
+_upim-find_  | Searches uPIM collections
+upim-contact | Contact manager
+_upim-cal_   | Calendar integration
 
 
 ### Libraries

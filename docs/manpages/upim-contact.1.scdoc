@@ -57,7 +57,7 @@ See *upim-contact*(5) for details on the contact note format.
 *edit* _NAME_ | _FILE_
 	Edit the given file or first discovered contact with the specified name
 
-Note that _upim-edit_ must be in the system or user path to use the *new* and
+Note that *upim-edit* must be in the system or user path to use the *new* and
 *edit* commands.
 
 # FILTER SYNTAX
@@ -154,8 +154,8 @@ $ upim-contact find 'Favorite Person'
 The above command with the default "find" alias definition is equivalent to:
 
 ```
-$ upim-contact --filter 'Name,Phone,Employer:Name' WHERE \
-Name = 'Favorite Person'
+$ upim-contact \\
+    --filter "'Name,Phone,Employer:Name' WHERE Name = 'Favorite Person'"
 ```
 
 Filters may be provided to further limit results:
@@ -166,13 +166,22 @@ $ upim-contact find 'Favorite Person' --filter '* WHERE Phone NOT EMPTY'
 
 # CONFIGURATION
 
+All configuration options for upim-contact may be set in the global upim.conf
+files. In addition, upim-contact reads the first configuration file found in the
+following paths:
 
-# FILES
+. /etc/upim/upim-contact.conf
+. $XDG_CONFIG_HOME/upim/upim-contact.conf if $XDG_CONFIG_HOME is defined;
+  otherwise $HOME/.config/upim/upim-contact.conf
+. (current working directory)/.upim-contact.conf
 
+See *upim.conf*(5) for more information.
 
-# EXAMPLES
+# ENVIRONMENT
 
+*upim-edit* must be in the PATH and be properly configured for the *new* and
+*edit* commands to function.
 
 # SEE ALSO
 
-*upim*(7), *upim-contact*(5), *upim-conf*(5)
+*upim*(7), *upim-conf*(5)
