@@ -35,7 +35,7 @@ pub fn read_config(path: Option<PathBuf>)
             Err(errs) => errors = errs,
         }
 
-        conf.set_default("field_separator", " | ")
+        conf.set_default("field_separator", "' | '")
     };
 
     let conf_path = path.or_else(find_default_configuration);
