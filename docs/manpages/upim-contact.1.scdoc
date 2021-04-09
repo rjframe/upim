@@ -52,10 +52,13 @@ See *upim-contact*(5) for details on the contact note format.
 ## Commands
 
 *new* _NAME_
-	Create a new contact with the given name in the default collection
+	Create and edit a new contact with the given name in the default collection
 
 *edit* _NAME_ | _FILE_
 	Edit the given file or first discovered contact with the specified name
+
+Note that _upim-edit_ must be in the system or user path to use the *new* and
+*edit* commands.
 
 # FILTER SYNTAX
 
@@ -112,7 +115,6 @@ With the = and NOT operators, upim-contact performs string comparisons. For all
 other operators, the value is converted to a floating-point number prior to
 performing the comparison. If the value is unable to be parsed as a numeric
 value, upim-contact will display an error message.
-
 
 ## Query Functions
 

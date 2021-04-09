@@ -11,6 +11,7 @@ mod either;
 mod filter;
 
 use std::{
+    path::Path,
     str::FromStr as _,
     env,
 };
@@ -26,6 +27,8 @@ use filter::Query;
 
 
 fn main() -> anyhow::Result<()> {
+    use std::process::Command as Proc;
+
     let opts = Options::new(env::args())?;
 
     let conf = read_config(opts.conf_path)
@@ -77,8 +80,23 @@ fn main() -> anyhow::Result<()> {
                 None => return Err(anyhow!("Unknown alias: {}", name)),
             }
         },
-        Command::New(_name) => {
-            todo!();
+        Command::New(name) => {
+            let collection = if let Some(coll) = &opts.collection {
+                coll
+            } else {
+                &conf["default_collection"]
+            };
+
+            let name = new_normalized_name(
+                &name,
+                &collection_path(&conf, &collection)?
+            );
+
+            Proc::new("upim-edit")
+                .args(&["-C", collection, &name])
+                .spawn()?
+                .wait()?;
+
             None
         },
         Command::Edit(_name) => {
@@ -99,4 +117,34 @@ fn main() -> anyhow::Result<()> {
     };
 
     Ok(())
+}
+
+/// Return the filename for a new contact.
+fn new_normalized_name(name: &str, def_collection_path: &Path) -> String {
+    use std::path::PathBuf;
+
+    // TODO: Replace all invalid filename characters for Windows, Mac, Linux
+    let name = name.replace(' ', "_");
+    let path = PathBuf::from(def_collection_path);
+
+    let mut i = 0;
+    loop {
+        let mut filename = if i > 0 {
+            let mut n = name.clone();
+            n.push_str(&i.to_string());
+            n
+        } else {
+            name.clone()
+        };
+
+        filename.push_str(".contact");
+
+        if ! path.join(&filename).exists() {
+            // TODO: Check fs::metadata for errors. Inability to access the
+            // filesystem will be an infinite loop.
+            break filename;
+        } else {
+            i+= 1;
+        }
+    }
 }
