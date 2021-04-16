@@ -343,6 +343,16 @@ impl Config {
             })
     }
 
+    pub fn group_as_dict<'a>(&'a self, group: &'a str) ->
+        impl Iterator + 'a + Iterator<Item = (String, &String)>
+    {
+        self.variables_in_group(group)
+            .map(move |v| self.values.get_key_value(
+                &(group.to_owned(), v.to_owned())).unwrap()
+            )
+            .map(|(k, v)| (k.1.to_owned(), v))
+    }
+
     /// Retrieve the value of the specified variable within the DEFAULT group,
     /// or `None` if it is not set.
     pub fn get_default(&self, variable: &str) -> Option<&String> {

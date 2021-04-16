@@ -69,7 +69,7 @@ pub fn read_config(path: Option<PathBuf>)
         Err(e) => errors.push(e),
     }
 
-    if let Err(mut errs) = validate_aliases(conf.variables_in_group("Aliases"))
+    if let Err(mut errs) = validate_aliases(conf.group_as_dict("Aliases"))
     {
         errors.append(&mut errs);
     }
@@ -151,19 +151,17 @@ fn validate_field_separator(val: &str)
 
 fn validate_aliases<'a, I>(aliases: I)
 -> std::result::Result::<(), Vec<ConfigurationError>>
-    where I: Iterator<Item = &'a String>,
+    where I: Iterator<Item = (String, &'a String)>
 {
     let mut errors = vec![];
 
-    // TODO: Take alias name as param for error messages.
-
-    for alias in aliases {
-        for part in alias.split("--") {
+    for (alias, commands) in aliases {
+        for part in commands.split("--") {
             // TODO: Validate all possible options
             if let Some(filter) = part.strip_prefix("filter") {
                 if let Err(e) = Query::from_str(&filter.trim_start()) {
                     errors.push(ConfigurationError::InvalidValue {
-                        data: format!("{}", e),
+                        data: format!("In alias {}: {}", alias, e),
                         rules: "Invalid filter".into(),
                     });
                 }
@@ -239,31 +237,35 @@ mod tests {
     #[test]
     fn validate_default_aliases() {
         let aliases = vec![
-            "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1",
-            "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0'",
+            ("first",
+             "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1"
+                .into()),
+            ("second", "--filter 'Name,Phone,Employer:Name' WHERE Name = '$0'"
+                .into()),
         ];
         let aliases = aliases.iter()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>();
+            .map(move |(a, b)| (a.to_string(), b));
 
-        assert!(validate_aliases(aliases.iter()).is_ok())
+        assert!(validate_aliases(aliases).is_ok())
     }
 
     #[test]
     fn error_when_validating_bad_filter() {
         let aliases = vec![
-            "--filter Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1",
-            "--filter Name,Phone,Employer:Name' WHERE Name > '$0'",
-            "--filter 'Name,Phone,Employer:Name' WHERE",
+            ("first",
+             "--filter Name,Phone,Employer:Name' WHERE Name = '$0' --limit 1"
+                .into()),
+            ("second", "--filter Name,Phone,Employer:Name' WHERE Name > '$0'"
+                .into()),
+            ("third", "--filter 'Name,Phone,Employer:Name' WHERE".into()),
         ];
 
         let aliases = aliases.iter()
-            .map(|s| vec![s.to_string()])
-            .collect::<Vec<Vec<String>>>();
+            .map(|(a, b)| (a.to_string(), b));
 
-        for alias in aliases {
-            assert!(validate_aliases(alias.iter()).is_err())
-        }
+        let res = validate_aliases(aliases);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err().len(), 3);
     }
 
     #[test]
