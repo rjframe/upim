@@ -30,8 +30,6 @@ impl fmt::Display for FileError {
 
 impl Error for FileError {}
 
-// TODO: Find where I do this and probably convert from a tuple instead so I
-// have a path.
 impl From<io::Error> for FileError {
     fn from(err: io::Error) -> FileError {
         FileError::IO((PathBuf::default(), err.kind()))

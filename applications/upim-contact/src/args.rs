@@ -305,16 +305,24 @@ mod tests {
         assert_eq!(opts.collection, Some("work-contacts".into()));
     }
 
-    // TODO: The --conf path must exist; need cross-platform test.
-    #[cfg(unix)]
     #[test]
     fn args_conf_path() {
-        let args = vec!["upim-contact", "--conf", "/dev/null"];
+        use std::env::temp_dir;
+        use std::fs::{remove_file, File};
+
+        let path = temp_dir().join("test_args_conf_path");
+        let _ = File::create(&path).unwrap();
+
+        let path_str = &path.to_string_lossy();
+        let args = vec!["upim-contact", "--conf", path_str];
         let args = args.iter().map(|s| s.to_string());
 
-        let opts = Options::new(args).unwrap();
+        let opts = Options::new(args);
+        let _ = remove_file(&path);
+
+        let opts = opts.unwrap();
         assert!(! opts.is_valid());
-        assert_eq!(opts.conf_path.unwrap().to_str().unwrap(), "/dev/null");
+        assert_eq!(opts.conf_path.unwrap().to_str().unwrap(), path_str);
     }
 
     #[test]

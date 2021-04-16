@@ -215,18 +215,27 @@ mod tests {
         assert!(opts.is_err());
     }
 
-    // TODO: The --conf path must exist; need cross-platform test.
-    #[cfg(unix)]
     #[test]
     fn args_conf_path() {
-        let args = vec![
-            "upim-edit", "--conf", "/dev/null", "/tmp/some-file.txt"
-        ];
+        use std::env::temp_dir;
+        use std::fs::{remove_file, File};
+
+        let temp_str = temp_dir();
+        let temp_str = temp_str.to_string_lossy();
+
+        let path = temp_dir().join("test_args_conf_path");
+        let _ = File::create(&path).unwrap();
+
+        let path_str = &path.to_string_lossy();
+        let args = vec!["upim-edit", "--conf", &temp_str, path_str];
         let args = args.iter().map(|s| s.to_string());
 
-        let opts = Options::new(args).unwrap();
-        assert_eq!(opts.conf_path.unwrap().to_str().unwrap(), "/dev/null");
-        assert_eq!(opts.file.to_str().unwrap(), "/tmp/some-file.txt");
+        let opts = Options::new(args);
+        let _ = remove_file(&path);
+
+        let opts = opts.unwrap();
+        assert_eq!(opts.conf_path.unwrap().to_str().unwrap(), &temp_str);
+        assert_eq!(opts.file.to_str().unwrap(), path_str);
         assert_eq!(opts.action, Action::Edit);
     }
 
