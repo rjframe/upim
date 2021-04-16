@@ -2,7 +2,6 @@
 #![feature(iter_advance_by)]
 #![feature(option_result_contains)]
 #![feature(pattern)]
-#![allow(dead_code)] // TODO: Only for early development
 
 mod args;
 mod config;
@@ -16,7 +15,7 @@ use std::{
     env,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 
 use upim_core::paths::collection_path;
 
@@ -90,7 +89,7 @@ fn main() -> anyhow::Result<()> {
             let name = new_normalized_name(
                 &name,
                 &collection_path(&conf, &collection)?
-            );
+            ).context("Cannot create new file")?;
 
             Proc::new("upim-edit")
                 .args(&["-C", collection, &name])
@@ -149,10 +148,16 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Return the filename for a new contact.
-fn new_normalized_name(name: &str, def_collection_path: &Path) -> String {
+fn new_normalized_name(name: &str, def_collection_path: &Path)
+-> anyhow::Result<String> {
     use std::path::PathBuf;
 
     let path = PathBuf::from(def_collection_path);
+
+    if ! path.exists() {
+        return Err(anyhow!("Cannot access collection directory"))
+    }
+
     let filename = normalize_contact_name(name);
 
     let mut i = 0;
@@ -160,9 +165,14 @@ fn new_normalized_name(name: &str, def_collection_path: &Path) -> String {
         let filename = add_name_index_and_ext(&filename, i);
 
         if ! path.join(&filename).exists() {
-            // TODO: Check fs::metadata for errors. Inability to access the
-            // filesystem will be an infinite loop.
-            break filename;
+            // An inability to access the filesystem between the path check
+            // above and this filename check will be an infinite loop. We check
+            // the directory path again to prevent that.
+            if ! path.exists() {
+                return Err(anyhow!("Cannot access collection directory"))
+            }
+
+            break Ok(filename);
         } else {
             i += 1;
         }
