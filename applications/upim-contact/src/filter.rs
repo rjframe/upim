@@ -132,11 +132,14 @@
 
 use std::str::FromStr;
 
-use anyhow::{anyhow, Context as _};
+use anyhow::Context as _;
 
 use upim_core::uniq::Uniq as _;
 
-use crate::either::Either;
+use crate::{
+    either::Either,
+    error::{ConditionConversionError, FunctionParseError, QueryConversionError},
+};
 
 
 /// Supported operators on filters.
@@ -155,9 +158,9 @@ impl Default for FilterOp {
 }
 
 impl FromStr for FilterOp {
-    type Err = anyhow::Error;
+    type Err = ConditionConversionError;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "="   => Ok(Self::EqualTo),
             "<"   => Ok(Self::LessThan),
@@ -165,7 +168,7 @@ impl FromStr for FilterOp {
             ">"   => Ok(Self::GreaterThan),
             ">="  => Ok(Self::GreaterEq),
             "NOT" => Ok(Self::Not),
-            _ => Err(anyhow!("Invalid string for Filter operator: {}", s))
+            _ => Err(Self::Err::UnknownOperator(s.to_owned()))
         }
     }
 }
@@ -196,34 +199,6 @@ pub enum Function {
     /// Match the given field's value against the provided regular expression.
     Regex(String, String),
 }
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum FunctionParseError {
-    InvalidArguments(String),
-    MissingClosingParenthesis,
-    NoVariableAssignment(String),
-    InvalidOperator(FilterOp),
-    UnknownFunction(String),
-}
-
-impl std::fmt::Display for FunctionParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FunctionParseError::InvalidArguments(s) =>
-                write!(f, "Invalid argument: {}", s),
-            FunctionParseError::MissingClosingParenthesis =>
-                write!(f, "Missing closing parenthesis"),
-            FunctionParseError::NoVariableAssignment(s) =>
-                write!(f, "Variable assignment from function expected; received: {}", s),
-            FunctionParseError::InvalidOperator(op) =>
-                write!(f, "Invalid operator: {}", op),
-            FunctionParseError::UnknownFunction(s) =>
-                write!(f, "Unknown function: {}", s),
-        }
-    }
-}
-
-impl std::error::Error for FunctionParseError {}
 
 impl FromStr for Function {
     type Err = FunctionParseError;
@@ -350,9 +325,9 @@ impl Default for Condition {
 }
 
 impl FromStr for Condition {
-    type Err = anyhow::Error;
+    type Err = ConditionConversionError;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         // TODO: Building a proper syntax tree can let us do better and our code
         // would probably look a lot nicer too.
         let mut s = s.trim_start();
@@ -366,7 +341,7 @@ impl FromStr for Condition {
 
         if len == s.len() {
             return cond1
-                .ok_or_else(|| anyhow!("Invalid condition string: {}", s));
+                .ok_or_else(|| Self::Err::Invalid(s.to_owned()));
         }
         s = &s[len..s.len()].trim_start();
 
@@ -387,7 +362,7 @@ impl FromStr for Condition {
             match op {
                 "AND " => Ok(Condition::And(Box::new((cond1, cond2)))),
                 "OR " => Ok(Condition::Or(Box::new((cond1, cond2)))),
-                _ => panic!("Unknown operator"),
+                _ => Err(Self::Err::UnknownOperator(op.to_owned())),
             }
         } else {
             match Function::from_str(s) {
@@ -416,7 +391,9 @@ impl FromStr for Condition {
 
                     if is_quoted(s) {
                         if !(op == FilterOp::EqualTo || op == FilterOp::Not) {
-                            Err(anyhow!("Cannot make comparison with string"))
+                            Err(Self::Err::BadComparison(
+                                "Cannot make comparison with string".to_owned()
+                            ))
                         } else {
                             Ok(Condition::Filter(
                                 field,
@@ -427,11 +404,11 @@ impl FromStr for Condition {
                     } else if s.parse::<f64>().is_ok() {
                         Ok(Condition::Filter(field, op, s.into()))
                     } else {
-                        Err(anyhow!("The string literal is not quoted: {}", s))
+                        Err(Self::Err::UnquotedString(s.to_owned()))
                     }
                 },
                 Err(e) => {
-                    Err(anyhow::Error::from(e))
+                    Err(e.into())
                 }
             }
         }
@@ -447,9 +424,9 @@ pub struct Query {
 }
 
 impl FromStr for Query {
-    type Err = anyhow::Error;
+    type Err = QueryConversionError;
 
-    fn from_str(s: &str) -> anyhow::Result<Self> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let mut s = s;
         let mut f = Self::default();
 
@@ -465,7 +442,7 @@ impl FromStr for Query {
         s = s[idx..s.len()].trim_start();
 
         if s.len() < 6 || s[0..5].to_ascii_uppercase() != "WHERE" {
-            return Err(anyhow!("Expected WHERE clause: found: {}", s));
+            return Err(QueryConversionError::MissingWhere(s.to_owned()));
         } else {
             s = s[5..s.len()].trim_start();
         }
@@ -564,7 +541,8 @@ pub(crate) fn is_quoted(s: &str) -> bool {
 ///
 /// Returns the text (excluding the parenthesis) and the number of characters
 /// (not bytes) read.
-fn get_inner_expression(s: &str) -> anyhow::Result<(usize, &str)> {
+fn get_inner_expression(s: &str)
+-> std::result::Result<(usize, &str), ConditionConversionError> {
     let mut level = 0;
     let mut i: isize = -1;
 
@@ -581,7 +559,7 @@ fn get_inner_expression(s: &str) -> anyhow::Result<(usize, &str)> {
     if level == 0 {
         Ok(((i+1) as usize, &s[1..=(i-1) as usize]))
     } else {
-        Err(anyhow!("Not a parenthesized expression"))
+        Err(ConditionConversionError::MismatchedParenthesis)
     }
 }
 
@@ -590,13 +568,14 @@ fn get_inner_expression(s: &str) -> anyhow::Result<(usize, &str)> {
 /// # Returns
 ///
 /// Returns the number of characers read and the field name.
-fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
+fn read_field(s: &str)
+-> std::result::Result<(usize, String), ConditionConversionError> {
     let (start_idx, end_idx) = {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
             Some('"') => (1, '"'),
             Some(_) => (0, ' '),
-            None => return Err(anyhow!("Expected a field name"))
+            None => return Err(ConditionConversionError::MissingField)
         };
 
         let end_idx = s[1..s.len()]
@@ -614,10 +593,12 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
                 s[start_idx..i].into()
             ))
             } else {
-                Err(anyhow!("Field name is not valid: {}", &s[start_idx..i]))
+                Err(ConditionConversionError::InvalidFieldName(
+                    s[start_idx..i].to_owned()
+                ))
             }
         },
-        None => Err(anyhow!("Invalid field string: {}", s))
+        None => Err(ConditionConversionError::InvalidFieldName(s.to_owned()))
     }
 }
 
@@ -626,7 +607,8 @@ fn read_field(s: &str) -> anyhow::Result<(usize, String)> {
 /// # Returns
 ///
 /// Returns the number of characters read and the list of fields.
-fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
+fn read_fields(s: &str)
+-> std::result::Result<(usize, Vec<String>), ConditionConversionError> {
     let (start_idx, end_idx) = {
         let (start_idx, end_char) = match s.chars().next() {
             Some('\'') => (1, '\''),
@@ -636,7 +618,7 @@ fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
         };
 
         // If the end_char is a space and we don't have one later, the input is
-        // a list of fields with no WHERE clause. This is valid -- We'll print
+        // a list of fields with no WHERE clause. This is valid -- we'll print
         // the fields for all contacts.
         let end_idx = s[1..s.len()].find(end_char)
             .map(|i| i + 1) // Take us to the char past the end.
@@ -665,10 +647,14 @@ fn read_fields(s: &str) -> anyhow::Result<(usize, Vec<String>)> {
             if is_valid {
                 Ok(res)
             } else {
-                Err(anyhow!("Invalid field name in: {}", &s[start_idx..i]))
+                Err(ConditionConversionError::InvalidFieldName(
+                    s[start_idx..i].to_owned()
+                ))
             }
         },
-        None => Err(anyhow!("Expected closing quote in field list"))
+        None => Err(ConditionConversionError::Invalid(
+            "Missing closing quotation mark in field list".to_owned()
+        ))
     }
 }
 
@@ -685,12 +671,13 @@ fn read_variable(s: &str) -> anyhow::Result<(usize, String)> {
 /// # Returns
 ///
 /// Returns the number of characters read and the [FilterOp | operator].
-fn read_op(s: &str) -> anyhow::Result<(usize, FilterOp)> {
+fn read_op(s: &str)
+-> std::result::Result<(usize, FilterOp), ConditionConversionError> {
     if let Some((op, _)) = s.split_once(' ') {
         let operator = FilterOp::from_str(op)?;
         Ok((op.len(), operator))
     } else {
-        Err(anyhow!("Invalid operator clause: {}", s))
+        Err(ConditionConversionError::MissingOperator)
     }
 }
 

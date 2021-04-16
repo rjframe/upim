@@ -156,7 +156,6 @@ fn validate_aliases<'a, I>(aliases: I)
     let mut errors = vec![];
 
     // TODO: Take alias name as param for error messages.
-    // TODO: Real errors for Query::from_str so we can do better here.
 
     for alias in aliases {
         for part in alias.split("--") {

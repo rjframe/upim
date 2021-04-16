@@ -7,6 +7,7 @@ mod args;
 mod config;
 mod contact;
 mod either;
+mod error;
 mod filter;
 
 use std::{
