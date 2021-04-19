@@ -5,6 +5,5 @@ authors = ["Ryan Frame <code@ryanjframe.com>"]
 license = "MPL-2.0"
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+home = "0.5.3"

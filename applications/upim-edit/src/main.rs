@@ -18,11 +18,12 @@ use std::{
     fs,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context as _};
 
 use upim_core::{
     config::*,
     error::FileError,
+    paths::expand_tilde,
 };
 use upim_note::Note;
 
@@ -73,7 +74,8 @@ fn main() -> anyhow::Result<()> {
             let (path, templ) = determine_file_path(&options, &conf)?;
 
             if let Some(ref templ) = templ {
-                fs::copy(templ, &path)?;
+                fs::copy(templ, &path)
+                    .context("While copying template")?;
             };
 
             launch_editor(editor, editor_arg, &path, templ.as_deref())?;
@@ -379,20 +381,23 @@ fn determine_file_path(options: &Options, conf: &Config)
 
     if options.file.is_absolute() {
         return Err(
-            anyhow!("Cannot specify an absolute path with a collection"));
+            anyhow!("Cannot specify both an absolute path and a collection"));
     }
 
     if let Some(path) = conf.get("Collections", &coll) {
         // We need to use the collection directory to generate the file's
         // absolute path.
 
-        let mut path = PathBuf::from(path);
+        let mut path = expand_tilde(Path::new(path))
+            .ok_or_else(|| anyhow!("Cannot expand user's home"))?;
+
         path.push(&options.file);
 
         let path = if path.is_relative() {
             match conf.get_default("collection_base") {
                 Some(base) => {
-                    let mut base = PathBuf::from(base);
+                    let mut base = expand_tilde(Path::new(base))
+                        .ok_or_else(|| anyhow!("Cannot expand user's home"))?;
                     base.push(path);
                     base
                 },
@@ -414,7 +419,8 @@ fn determine_file_path(options: &Options, conf: &Config)
             // exists.
 
             if let Some(templ) = conf.get_default("template_folder") {
-                let mut templ = PathBuf::from(templ);
+                let mut templ = expand_tilde(Path::new(templ))
+                    .ok_or_else(|| anyhow!("Cannot expand user home"))?;
                 templ.push(&coll);
                 templ.set_extension("template");
 
