@@ -291,6 +291,8 @@ fn read_config(path: &Path)
             .map(|e| ConfigurationError::Config(e.clone()))
                 .collect::<Vec<ConfigurationError>>())?;
 
+    let mut errs = vec![];
+
     if conf.get_default("editor").is_none() {
         let editor = env::var_os("EDITOR").map(|e| e.into_string());
 
@@ -298,23 +300,23 @@ fn read_config(path: &Path)
             if let Ok(editor) = editor {
                 conf = conf.set_default("editor", &editor);
             } else {
-                return Err(vec![
+                errs.push(
                     ConfigurationError::Environment(
                         "Cannot convert $EDITOR to a UTF-8 string".into()
                     )
-                ]);
+                );
             }
         } else {
-            return Err(vec![
+            errs.push(
                 ConfigurationError::Environment(
                     "No text editor is configured".into()
                 )
-            ]);
+            );
         }
     }
 
     if conf.get_default("editor_arg").is_none() {
-        // Safe to unwrap: we added it above if it was missing.
+        // Safe to unwrap: we added editor above if it was missing.
         let editor = conf.get_default("editor").unwrap();
 
         // If we know what argument an editor needs to tell it to run in the
@@ -330,31 +332,64 @@ fn read_config(path: &Path)
     let global = read_upim_configuration()
         .map_err(|v| v.iter()
             .map(|e| ConfigurationError::Config(e.clone()))
-                .collect::<Vec<ConfigurationError>>())?;
+                .collect::<Vec<ConfigurationError>>());
+
+    let global = match global {
+        Ok(c) => c,
+        Err(mut e) => { errs.append(&mut e); return Err(errs); },
+    };
 
     if conf.get_default("template_folder").is_none() {
-        if let Some(folder) = global.get_default("template_folder") {
-            conf = conf.set_default("template_folder", folder);
+        let folder = global.get_default("template_folder")
+            .map(|f| expand_tilde(Path::new(f)))
+            .flatten();
+
+        if let Some(folder) = folder {
+            conf = conf.set_default(
+                "template_folder",
+                &folder.to_string_lossy()
+            );
         };
     }
 
     if conf.get_default("collection_base").is_none() {
-        if let Some(folder) = global.get_default("collection_base") {
-            conf = conf.set_default("collection_base", folder);
+        let folder = global.get_default("collection_base")
+            .map(|f| expand_tilde(Path::new(f)))
+            .flatten();
+
+        if let Some(folder) = folder {
+            conf = conf.set_default(
+                "collection_base",
+                &folder.to_string_lossy()
+            );
         };
     }
 
     for coll in global.variables_in_group("Collections") {
-        if conf.get("Collections", &coll).is_none() {
-            conf = conf.set(
-                "Collections",
-                &coll,
-                global[("Collections", coll.as_str())].as_str()
+        let path = global[("Collections", coll.as_str())].as_str();
+
+        if let Some(path) = expand_tilde(Path::new(path)) {
+            if conf.get("Collections", &coll).is_none() {
+                conf = conf.set(
+                    "Collections",
+                    &coll,
+                    &path.to_string_lossy()
+                );
+            }
+        } else {
+            errs.push(
+                ConfigurationError::Environment(
+                    "Cannot expand user's home directory".into()
+                )
             );
-        }
+        };
     }
 
-    Ok(conf)
+    if errs.is_empty() {
+        Ok(conf)
+    } else {
+        Err(errs)
+    }
 }
 
 /// Get the path to the first upim-edit.conf file found.
